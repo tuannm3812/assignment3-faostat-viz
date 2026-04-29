@@ -14,6 +14,8 @@ The project includes:
 - `data/raw/`: Raw data files downloaded from FAOSTAT and other sources. This folder is gitignored except for .gitkeep.
 - `data/processed/`: Cleaned and processed data ready for analysis. This folder is gitignored except for .gitkeep.
 - `notebooks/`: Jupyter notebooks for exploratory data analysis and visualization.
+  - `01_data_api/`: Notebooks for fetching data from FAOSTAT and other dataset APIs.
+  - `02_analysis/`: Notebooks for exploratory data analysis and visualization.
 - `src/data/`: Python scripts for data fetching, cleaning, and preprocessing.
 - `app/`: Streamlit application for the interactive dashboard.
 
