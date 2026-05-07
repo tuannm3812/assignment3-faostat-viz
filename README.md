@@ -1,69 +1,108 @@
-# Global Food Price Shocks and Hunger Index Analysis
+# FAOSTAT Food Price Shock Visualisation
 
-## Project Overview
+Interactive Streamlit dashboard for exploring FAOSTAT producer prices for Australia and New Zealand, enriched with FAO Food Price Index, Global Hunger Index, and World Bank food import dependency data.
 
-This project analyzes global food price shocks using FAOSTAT data and correlates them with the Global Hunger Index. The goal is to provide insights into how price fluctuations impact food security worldwide.
+The current app runs from local CSV files. A realtime FAOSTAT/API ingestion layer can be added later without changing the dashboard structure.
 
-The project includes:
-- Data fetching and cleaning scripts
-- Exploratory data analysis notebooks
-- An interactive Streamlit dashboard for visualization
+## Project Story
 
-## Folder Structure
+The dashboard follows the group's Sparkline narrative:
 
-- `data/raw/`: Raw data files downloaded from FAOSTAT and other sources. This folder is gitignored except for .gitkeep.
-- `data/processed/`: Cleaned and processed data ready for analysis. This folder is gitignored except for .gitkeep.
-- `notebooks/`: Jupyter notebooks for exploratory data analysis and visualization.
-  - `01_data_api/`: Notebooks for fetching data from FAOSTAT and other dataset APIs.
-  - `02_analysis/`: Notebooks for exploratory data analysis and visualization.
-- `src/data/`: Python scripts for data fetching, cleaning, and preprocessing.
-- `app/`: Streamlit application for the interactive dashboard.
+> When Australia and New Zealand commodity prices spike alongside global food prices, import-dependent and hunger-vulnerable countries face the highest food security risk.
 
-## Setup Instructions
+The main analytical layers are:
 
-### Prerequisites
-- Python 3.8+
-- Git
+- Producer price trends for AUS/NZ commodities in USD per tonne.
+- Commodity volatility using coefficient of variation.
+- Global FAO Food Price Index shock context.
+- Global Hunger Index context.
+- Vulnerability matrix combining hunger severity and food import dependency.
+- What-if scenario slider for producer price shocks.
 
-### Installation
-1. Clone the repository:
-   ```
-   git clone https://github.com/yourusername/your-repo-name.git
-   cd your-repo-name
-   ```
+## Repository Structure
 
-2. Create a virtual environment:
-   ```
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
+```text
+assignment3-faostat-viz/
+├── app/
+│   └── main.py                         # Streamlit dashboard
+├── data/
+│   ├── raw/                            # Original downloads only
+│   └── processed/                      # Cleaned CSVs used by the app
+├── notebooks/
+│   ├── 01_data_api/
+│   │   └── FPP_data_cleaning_pipeline.ipynb
+│   └── 02_analysis/
+│       └── FPP_EDA.ipynb
+├── src/
+│   └── data/
+│       └── make_dataset.py             # Data cleaning entry point placeholder
+├── requirements.txt
+└── README.md
+```
 
-3. Install dependencies:
-   ```
-   pip install -r requirements.txt
-   ```
+## Local Data Files
 
-### Running the Notebooks
-1. Activate the virtual environment (if not already activated).
-2. Start Jupyter:
-   ```
-   jupyter notebook
-   ```
-3. Navigate to the `notebooks/` folder and open desired notebooks.
+Place these cleaned files in `data/processed/`:
 
-### Running the Streamlit App
-1. Activate the virtual environment (if not already activated).
-2. Run the app:
-   ```
-   streamlit run app/main.py
-   ```
-3. Open your browser to the provided URL (usually http://localhost:8501).
+- `master_producer_prices_usd.csv`
+- `master_producer_price_index.csv`
+- `master_producer_prices_lcu.csv`
+- `ffpi_monthly.csv`
+- `ffpi_annual.csv`
+- `ghi_cleaned.csv`
+- `worldbank_food_import_pct.csv`
 
-## Branching Policy
+The app also checks `data/raw/` as a fallback for older local layouts, but the preferred structure is `data/processed/`.
 
-- `main`: Production-ready code. Only merge via pull requests after review.
-- `develop`: Integration branch for features. Merge feature branches here.
-- `feature/*`: Feature branches. Create from develop, merge back to develop.
-- `hotfix/*`: Emergency fixes. Create from main, merge to both main and develop.
+## Setup
 
-Always create pull requests for merging, and ensure CI/CD passes before merging.
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+On macOS/Linux, activate with:
+
+```bash
+source venv/bin/activate
+```
+
+## Run the Dashboard
+
+```bash
+streamlit run app/main.py
+```
+
+Streamlit will print a local URL, usually `http://localhost:8501`.
+
+## Notebook Path Notes
+
+The notebooks currently contain relative paths that assume the notebook is run from a folder containing the source or cleaned files directly. For the repo structure above, use these conventions when updating notebook cells:
+
+- Raw downloads: `../../data/raw/<filename>`
+- Cleaned outputs: `../../data/processed/<filename>`
+- Dashboard reads: `data/processed/<filename>` from the repo root
+
+Recommended output path in the cleaning notebook:
+
+```python
+from pathlib import Path
+
+ROOT_DIR = Path.cwd().parents[1]
+OUT_DIR = ROOT_DIR / "data" / "processed"
+OUT_DIR.mkdir(parents=True, exist_ok=True)
+```
+
+## Dashboard Views
+
+- `Overview`: coverage, commodity count, producer price rows, latest FFPI, and top vulnerability scores.
+- `Price Trends`: selectable commodity time series for Australia/New Zealand with FFPI overlay and crisis-year bands.
+- `Volatility`: highest coefficient-of-variation commodities by country.
+- `Global Context`: FFPI annual and monthly shock timelines plus GHI choropleth.
+- `Vulnerability`: GHI x food import dependency scatter and what-if shock scenario.
+- `Data Explorer`: inspect the local CSV tables.
+
+## Next API Step
+
+When the FAOSTAT API guideline is ready, add ingestion code under `src/data/`, write cleaned outputs to `data/processed/`, and keep `app/main.py` reading the same table names. That keeps the dashboard stable while the data source changes from local files to realtime refreshes.

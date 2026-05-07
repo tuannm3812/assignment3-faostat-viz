@@ -1,9 +1,13 @@
-"""
-Script for fetching and cleaning FAOSTAT data.
-"""
+"""Data cleaning helpers for FAOSTAT producer price files."""
 
 import pandas as pd
 from typing import Optional
+from pathlib import Path
+
+
+ROOT_DIR = Path(__file__).resolve().parents[2]
+RAW_DIR = ROOT_DIR / "data" / "raw"
+PROCESSED_DIR = ROOT_DIR / "data" / "processed"
 
 
 def clean_faostat_data(raw_filepath: str, processed_filepath: str) -> Optional[pd.DataFrame]:
@@ -30,7 +34,7 @@ def clean_faostat_data(raw_filepath: str, processed_filepath: str) -> Optional[p
 
 
 if __name__ == "__main__":
-    # Example usage
-    raw_path = "../../data/raw/faostat_raw.csv"
-    processed_path = "../../data/processed/faostat_processed.csv"
-    clean_faostat_data(raw_path, processed_path)
+    raw_path = RAW_DIR / "faostat_raw.csv"
+    processed_path = PROCESSED_DIR / "faostat_processed.csv"
+    PROCESSED_DIR.mkdir(parents=True, exist_ok=True)
+    clean_faostat_data(str(raw_path), str(processed_path))
