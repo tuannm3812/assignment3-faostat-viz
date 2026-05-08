@@ -11,6 +11,8 @@
 
 Interactive Streamlit dashboard for exploring FAOSTAT producer prices for Australia and New Zealand, enriched with FAO Food Price Index, Global Hunger Index, and World Bank food import dependency data.
 
+Live app: https://assignment3-faostat-viz.streamlit.app/
+
 The main analytical dashboard runs from local cleaned CSV files. A `Live FAOSTAT` page is included for testing realtime API pulls before those data are transformed into the dashboard-ready `data/processed` tables.
 
 ## Project Story
@@ -28,6 +30,18 @@ The main analytical layers are:
 - Vulnerability matrix combining hunger severity and food import dependency.
 - What-if scenario slider for producer price shocks.
 
+## Data Scope and Enrichment Logic
+
+The primary FAOSTAT dataset is intentionally focused on **Australia and New Zealand producer prices**. These countries are used as the supply-side case study because they are major food-producing and exporting economies in the Asia-Pacific region. The dashboard asks: when producer prices rise in this supplier context, which countries are most exposed to food-price stress?
+
+The enrichment datasets add the demand-side and global-risk context:
+
+- **FAO Food Price Index (FFPI)** is joined by `year` to show whether AUS/NZ producer price movements align with global food price shocks such as 2007-2008, 2010-2011, and 2022.
+- **Global Hunger Index (GHI)** is used as a global vulnerability layer. AUS and NZL are high-income countries and do not have meaningful GHI scores in this dataset, so GHI is not expected to enrich AUS/NZ rows directly. Instead, it powers the global hunger map and vulnerability matrix.
+- **World Bank food import dependency** measures how exposed countries are to international food-price changes. Combined with GHI, it identifies countries that may be less able to absorb price shocks.
+
+This means the project links supply-side price shocks from AUS/NZ with global exposure indicators from GHI and World Bank data. A future extension could expand the FAOSTAT producer-price pull to more exporting countries, but the current scope keeps the narrative focused and easier to interpret.
+
 ## Repository Structure
 
 ```text
@@ -38,12 +52,12 @@ assignment3-faostat-viz/
 |   |-- raw/                            # Original downloads only
 |   `-- processed/                      # Cleaned CSVs used by the app
 |-- notebooks/
-|   |-- 01_data_api/
-|   |   `-- FPP_data_cleaning_pipeline.ipynb
-|   `-- 02_analysis/
-|       `-- FPP_EDA.ipynb
+|   |-- 01_data_preparation/
+|   |   `-- 01_data_cleaning_pipeline.ipynb
+|   `-- 02_exploratory_analysis/
+|       `-- 02_exploratory_analysis.ipynb
 |-- src/
-|   `-- data/
+|   `-- data_pipeline/
 |       |-- faostat_client.py           # FAOSTAT API helper
 |       `-- make_dataset.py             # Data cleaning entry point placeholder
 |-- requirements.txt
@@ -51,6 +65,13 @@ assignment3-faostat-viz/
 ```
 
 ## Local Data Files
+
+Raw source files used to rerun the cleaning notebook live in `data/raw/`:
+
+- `faostat_producer_prices_aus_nzl.csv`
+- `fao_food_price_index.xlsx`
+- `global_hunger_index.xlsx`
+- `worldbank_food_import_raw.csv`
 
 Place these cleaned files in `data/processed/`:
 
@@ -62,7 +83,7 @@ Place these cleaned files in `data/processed/`:
 - `ghi_cleaned.csv`
 - `worldbank_food_import_pct.csv`
 
-The app also checks `data/raw/` as a fallback for older local layouts, but the preferred structure is `data/processed/`.
+The dashboard reads the cleaned tables in `data/processed/`. The raw files are only needed when rerunning the cleaning notebook from scratch.
 
 ## Setup
 
@@ -107,13 +128,13 @@ FAOSTAT access tokens are short-lived, so refresh this value when it expires.
 Example API discovery call from Python:
 
 ```bash
-python -c "from src.data.faostat_client import get_groups_and_domains; print(get_groups_and_domains().head())"
+python -c "from src.data_pipeline.faostat_client import get_groups_and_domains; print(get_groups_and_domains().head())"
 ```
 
 Example data retrieval matching the FAOSTAT guide:
 
 ```bash
-python -m src.data.faostat_client ^
+python -m src.data_pipeline.faostat_client ^
   --domain QCL ^
   --param area=106 ^
   --param item=15 ^
@@ -125,7 +146,7 @@ python -m src.data.faostat_client ^
 For Producer Prices, use the `PP` domain code and the relevant FAOSTAT query parameters:
 
 ```bash
-python -m src.data.faostat_client ^
+python -m src.data_pipeline.faostat_client ^
   --domain PP ^
   --param area=5501^> ^
   --param element=5530,5532,5539 ^
@@ -143,21 +164,11 @@ https://faostatservices.fao.org/api/v1/en/data/PP?area=5501%3E&element=5530%2C55
 
 ## Notebook Path Notes
 
-The notebooks currently contain relative paths that assume the notebook is run from a folder containing the source or cleaned files directly. For the repo structure above, use these conventions when updating notebook cells:
+Both notebooks resolve the repository root automatically, so they can be run from Jupyter after cloning without copying files into the notebook folders.
 
-- Raw downloads: `../../data/raw/<filename>`
-- Cleaned outputs: `../../data/processed/<filename>`
-- Dashboard reads: `data/processed/<filename>` from the repo root
-
-Recommended output path in the cleaning notebook:
-
-```python
-from pathlib import Path
-
-ROOT_DIR = Path.cwd().parents[1]
-OUT_DIR = ROOT_DIR / "data" / "processed"
-OUT_DIR.mkdir(parents=True, exist_ok=True)
-```
+- `notebooks/01_data_preparation/01_data_cleaning_pipeline.ipynb` reads from `data/raw/` and writes to `data/processed/`.
+- `notebooks/02_exploratory_analysis/02_exploratory_analysis.ipynb` reads from `data/processed/`.
+- `app/main.py` also reads from `data/processed/`.
 
 ## Dashboard Views
 
@@ -171,4 +182,4 @@ OUT_DIR.mkdir(parents=True, exist_ok=True)
 
 ## Next API Step
 
-Use the `Live FAOSTAT` page to confirm API filters, then move the confirmed query into the data pipeline under `src/data/`. The pipeline should write cleaned outputs to `data/processed/`, and the main dashboard should keep reading the same table names. That keeps the dashboard stable while the data source changes from static local files to refreshed API data.
+Use the `Live FAOSTAT` page to confirm API filters, then move the confirmed query into the data pipeline under `src/data_pipeline/`. The pipeline should write cleaned outputs to `data/processed/`, and the main dashboard should keep reading the same table names. That keeps the dashboard stable while the data source changes from static local files to refreshed API data.

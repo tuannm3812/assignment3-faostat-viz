@@ -14,7 +14,7 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.data.faostat_client import FaostatApiError, get_domain_data
+from src.data_pipeline.faostat_client import FaostatApiError, get_domain_data
 
 PROCESSED_DIR = ROOT_DIR / "data" / "processed"
 LEGACY_RAW_DIR = ROOT_DIR / "data" / "raw"

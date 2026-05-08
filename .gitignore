@@ -116,3 +116,7 @@ dmypy.json
 # Data Science specific
 data/raw/*
 !data/raw/.gitkeep
+!data/raw/faostat_producer_prices_aus_nzl.csv
+!data/raw/fao_food_price_index.xlsx
+!data/raw/global_hunger_index.xlsx
+!data/raw/worldbank_food_import_raw.csv
