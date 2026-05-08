@@ -76,6 +76,52 @@ streamlit run app/main.py
 
 Streamlit will print a local URL, usually `http://localhost:8501`.
 
+## FAOSTAT API Access
+
+The API client reads your token from `.env` or the active shell environment. Do not commit real tokens.
+
+Create a local `.env` file from the example:
+
+```bash
+copy .env.example .env
+```
+
+Then edit `.env`:
+
+```text
+FAOSTAT_ACCESS_TOKEN=your_current_access_token
+```
+
+FAOSTAT access tokens are short-lived, so refresh this value when it expires.
+
+Example API discovery call from Python:
+
+```bash
+python -c "from src.data.faostat_client import get_groups_and_domains; print(get_groups_and_domains().head())"
+```
+
+Example data retrieval matching the FAOSTAT guide:
+
+```bash
+python -m src.data.faostat_client ^
+  --domain QCL ^
+  --param area=106 ^
+  --param item=15 ^
+  --param element=2510 ^
+  --param year=2022 ^
+  --output data/raw/faostat_qcl_italy_wheat_2022.csv
+```
+
+For Producer Prices, use the `PP` domain code and the relevant FAOSTAT query parameters:
+
+```bash
+python -m src.data.faostat_client ^
+  --domain PP ^
+  --param area=36 ^
+  --param area=554 ^
+  --output data/raw/faostat_producer_prices.csv
+```
+
 ## Notebook Path Notes
 
 The notebooks currently contain relative paths that assume the notebook is run from a folder containing the source or cleaned files directly. For the repo structure above, use these conventions when updating notebook cells:
