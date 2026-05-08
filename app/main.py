@@ -353,14 +353,20 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
     vuln = vuln.copy()
     vuln["implied_cost_increase_pct"] = vuln["food_import_pct"] * shock_pct / 100
 
+    st.caption(
+        "The dots stay in the same x/y position because GHI and food import dependency are baseline indicators. "
+        "The slider changes the scenario impact, shown by dot colour and the what-if ranking below."
+    )
+
     x_med = vuln["ghi_2025"].median()
     y_med = vuln["food_import_pct"].median()
+    max_scenario_cost = data["worldbank"]["food_import_pct"].max() * 0.6
     fig = px.scatter(
         vuln,
         x="ghi_2025",
         y="food_import_pct",
         size="vulnerability_score",
-        color="vulnerability_score",
+        color="implied_cost_increase_pct",
         hover_name="country_ghi",
         hover_data={
             "ghi_2025": ":.1f",
@@ -368,13 +374,15 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
             "vulnerability_score": ":.1f",
             "implied_cost_increase_pct": ":.1f",
         },
-        color_continuous_scale="RdYlGn_r",
+        color_continuous_scale="YlOrRd",
+        range_color=[0, max_scenario_cost],
         labels={
             "ghi_2025": "GHI score 2025",
             "food_import_pct": "Food imports (% of merchandise imports)",
             "vulnerability_score": "Vulnerability score",
+            "implied_cost_increase_pct": "Implied cost increase (%)",
         },
-        title="Hunger Severity x Food Import Dependency",
+        title=f"Hunger Severity x Food Import Dependency under +{shock_pct}% Price Shock",
     )
     fig.add_vline(x=x_med, line_dash="dash", line_color="#777777")
     fig.add_hline(y=y_med, line_dash="dash", line_color="#777777")
