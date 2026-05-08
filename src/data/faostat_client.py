@@ -7,6 +7,7 @@ tokens in this file or commit them to the repository.
 from __future__ import annotations
 
 import argparse
+from io import BytesIO
 import os
 from pathlib import Path
 from typing import Any
@@ -50,6 +51,23 @@ def faostat_get(path: str, params: Any | None = None, language: str = "en") -> d
     return response.json()
 
 
+def faostat_get_csv(path: str, params: Any | None = None, language: str = "en") -> pd.DataFrame:
+    token = get_access_token()
+    clean_path = path.strip("/")
+    if not clean_path.startswith(f"{language}/"):
+        clean_path = f"{language}/{clean_path}"
+
+    response = requests.get(
+        f"{BASE_URL}/{clean_path}",
+        headers={"Authorization": f"Bearer {token}"},
+        params=params,
+        timeout=60,
+    )
+    if response.status_code >= 400:
+        raise FaostatApiError(f"FAOSTAT API error {response.status_code}: {response.text[:500]}")
+    return pd.read_csv(BytesIO(response.content))
+
+
 def response_to_dataframe(payload: dict[str, Any]) -> pd.DataFrame:
     """Convert common FAOSTAT response shapes into a dataframe."""
     for key in ("data", "Data", "results", "value"):
@@ -67,6 +85,16 @@ def get_groups_and_domains(language: str = "en") -> pd.DataFrame:
 
 
 def get_domain_data(domain: str, params: Any, language: str = "en") -> pd.DataFrame:
+    if params is None:
+        params = []
+    if isinstance(params, dict):
+        params = list(params.items())
+    if ("output_type", "csv") not in params:
+        params = [*params, ("output_type", "csv")]
+    return faostat_get_csv(f"data/{domain}", params=params, language=language)
+
+
+def get_domain_json_data(domain: str, params: Any, language: str = "en") -> pd.DataFrame:
     payload = faostat_get(f"data/{domain}", params=params, language=language)
     return response_to_dataframe(payload)
 

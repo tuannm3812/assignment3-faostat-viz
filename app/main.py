@@ -1,6 +1,7 @@
 """Streamlit dashboard for FAOSTAT food price shock analysis."""
 
 from pathlib import Path
+import sys
 
 import pandas as pd
 import plotly.express as px
@@ -10,6 +11,11 @@ from plotly.subplots import make_subplots
 
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
+if str(ROOT_DIR) not in sys.path:
+    sys.path.insert(0, str(ROOT_DIR))
+
+from src.data.faostat_client import FaostatApiError, get_domain_data
+
 PROCESSED_DIR = ROOT_DIR / "data" / "processed"
 LEGACY_RAW_DIR = ROOT_DIR / "data" / "raw"
 
@@ -178,12 +184,12 @@ def overview(data: dict[str, pd.DataFrame]) -> None:
     )
     fig.update_traces(texttemplate="%{text} commodities", textposition="outside")
     fig.update_layout(height=420, showlegend=False)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     st.subheader("Highest Vulnerability Scores")
     st.dataframe(
         vuln.head(10)[["country_ghi", "ghi_2025", "food_import_pct", "vulnerability_score"]].round(2),
-        use_container_width=True,
+        width="stretch",
         hide_index=True,
     )
 
@@ -243,14 +249,14 @@ def price_trends(data: dict[str, pd.DataFrame]) -> None:
     fig.update_xaxes(title_text="Year")
     fig.update_yaxes(title_text="Producer price (USD/tonne)", secondary_y=False)
     fig.update_yaxes(title_text="FFPI food index", secondary_y=True)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     outliers = filtered[filtered["is_outlier"].astype(str).str.lower() == "true"]
     if not outliers.empty:
         st.subheader("Flagged Outlier Observations")
         st.dataframe(
             outliers[["country", "item", "year", "value", "flag_description"]].sort_values("year"),
-            use_container_width=True,
+            width="stretch",
             hide_index=True,
         )
 
@@ -281,7 +287,7 @@ def volatility(data: dict[str, pd.DataFrame]) -> None:
     )
     fig.add_vline(x=50, line_dash="dash", line_color=COLORS["risk"], annotation_text="50% CV")
     fig.update_layout(height=max(500, top_n * 28), coloraxis_showscale=False)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
 
 def global_context(data: dict[str, pd.DataFrame]) -> None:
@@ -310,7 +316,7 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
     fig.add_hline(y=100, line_dash="dash", line_color="#555555")
     add_crisis_bands(fig)
     fig.update_layout(height=520)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     monthly = ffpi_m[ffpi_m["year"] >= 2000].copy()
     fig_monthly = px.area(
@@ -323,7 +329,7 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
     fig_monthly.add_hline(y=100, line_dash="dash", line_color="#555555")
     fig_monthly.update_traces(line_color="#2b2b2b", fillcolor="rgba(178, 24, 43, 0.22)")
     fig_monthly.update_layout(height=420)
-    st.plotly_chart(fig_monthly, use_container_width=True)
+    st.plotly_chart(fig_monthly, width="stretch")
 
     ghi_valid = ghi.dropna(subset=["iso3", "ghi_2025"])
     fig_map = px.choropleth(
@@ -336,7 +342,7 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
         title="Global Hunger Index 2025",
     )
     fig_map.update_layout(height=520, geo_showframe=False, geo_showcoastlines=True)
-    st.plotly_chart(fig_map, use_container_width=True)
+    st.plotly_chart(fig_map, width="stretch")
 
 
 def vulnerability(data: dict[str, pd.DataFrame]) -> None:
@@ -373,7 +379,7 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
     fig.add_vline(x=x_med, line_dash="dash", line_color="#777777")
     fig.add_hline(y=y_med, line_dash="dash", line_color="#777777")
     fig.update_layout(height=620)
-    st.plotly_chart(fig, use_container_width=True)
+    st.plotly_chart(fig, width="stretch")
 
     top = vuln.nlargest(15, "implied_cost_increase_pct").sort_values("implied_cost_increase_pct")
     fig_bar = px.bar(
@@ -387,7 +393,7 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
         title=f"What-if Scenario: +{shock_pct}% AUS/NZ Producer Price Shock",
     )
     fig_bar.update_layout(height=560)
-    st.plotly_chart(fig_bar, use_container_width=True)
+    st.plotly_chart(fig_bar, width="stretch")
 
 
 def data_explorer(data: dict[str, pd.DataFrame]) -> None:
@@ -403,7 +409,62 @@ def data_explorer(data: dict[str, pd.DataFrame]) -> None:
     label = st.selectbox("Dataset", list(label_to_key))
     df = data[label_to_key[label]]
     st.caption(f"{len(df):,} rows x {df.shape[1]:,} columns")
-    st.dataframe(df, use_container_width=True, hide_index=True)
+    st.dataframe(df, width="stretch", hide_index=True)
+
+
+@st.cache_data(show_spinner=False, ttl=3600)
+def load_live_faostat_pp(params: tuple[tuple[str, str], ...]) -> pd.DataFrame:
+    return get_domain_data("PP", list(params))
+
+
+def live_faostat(data: dict[str, pd.DataFrame]) -> None:
+    st.title("Live FAOSTAT Preview")
+    st.caption(
+        "This page calls the FAOSTAT Producer Prices API directly. "
+        "The main dashboard still uses cleaned local files in data/processed."
+    )
+
+    col1, col2 = st.columns(2)
+    with col1:
+        area = st.text_input("Area code/filter", value="5501>")
+        item = st.text_input("Item code", value="809")
+        month = st.text_input("Month code", value="7021")
+    with col2:
+        years = st.multiselect("Years", ["2025", "2024", "2023", "2022", "2021"], default=["2025", "2024", "2023"])
+        elements = st.multiselect(
+            "Elements",
+            ["5530", "5532", "5539"],
+            default=["5530", "5532", "5539"],
+            help="5530 LCU/tonne, 5532 USD/tonne, 5539 Producer Price Index.",
+        )
+
+    params = (
+        ("area", area),
+        ("element", ",".join(elements)),
+        ("item", item),
+        ("year", ",".join(years)),
+        ("month", month),
+        ("output_type", "csv"),
+    )
+    st.code(
+        "https://faostatservices.fao.org/api/v1/en/data/PP?"
+        + "&".join(f"{key}={value}" for key, value in params),
+        language="text",
+    )
+
+    if st.button("Fetch Live FAOSTAT Data", type="primary"):
+        try:
+            live_df = load_live_faostat_pp(params)
+        except FaostatApiError as exc:
+            st.error(str(exc))
+            st.info("Add a current FAOSTAT_ACCESS_TOKEN to your local .env file. Do not commit real tokens.")
+            return
+        except Exception as exc:
+            st.error(f"Could not fetch FAOSTAT data: {exc}")
+            return
+
+        st.success(f"Fetched {len(live_df):,} rows from FAOSTAT.")
+        st.dataframe(live_df, width="stretch", hide_index=True)
 
 
 def main() -> None:
@@ -414,7 +475,15 @@ def main() -> None:
         st.title("FAOSTAT Viz")
         page = st.radio(
             "View",
-            ["Overview", "Price Trends", "Volatility", "Global Context", "Vulnerability", "Data Explorer"],
+            [
+                "Overview",
+                "Price Trends",
+                "Volatility",
+                "Global Context",
+                "Vulnerability",
+                "Live FAOSTAT",
+                "Data Explorer",
+            ],
         )
         st.divider()
         st.caption(f"Local data: {PROCESSED_DIR}")
@@ -428,6 +497,7 @@ def main() -> None:
         "Volatility": volatility,
         "Global Context": global_context,
         "Vulnerability": vulnerability,
+        "Live FAOSTAT": live_faostat,
         "Data Explorer": data_explorer,
     }
     pages[page](data)
