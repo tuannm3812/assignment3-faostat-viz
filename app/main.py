@@ -35,11 +35,59 @@ CRISIS_PERIODS = [
 ]
 
 COLORS = {
-    "AUS": "#2166ac",
-    "NZL": "#b8552f",
-    "FFPI": "#4d4d4d",
-    "risk": "#b2182b",
+    "AUS": "#2f6f9f",
+    "NZL": "#9a6b2f",
+    "FFPI": "#4f5b62",
+    "risk": "#9f3a38",
+    "crisis": "#9f3a38",
+    "neutral": "#7a858c",
 }
+
+CHART_TEMPLATE = "plotly_white"
+COUNTRY_COLORS = {
+    "AUS": COLORS["AUS"],
+    "NZL": COLORS["NZL"],
+    "Australia": COLORS["AUS"],
+    "New Zealand": COLORS["NZL"],
+}
+FFPI_COLORS = {
+    "ffpi_food": "#4f5b62",
+    "ffpi_cereals": "#7b8f55",
+    "ffpi_meat": "#9a6b2f",
+    "ffpi_dairy": "#6f7f94",
+    "ffpi_oils": "#8b6f8f",
+    "ffpi_sugar": "#a75d4f",
+}
+RISK_SCALE = [
+    [0.00, "#edf3f1"],
+    [0.35, "#a8c5b5"],
+    [0.70, "#c9955c"],
+    [1.00, "#9f3a38"],
+]
+
+EXPOSURE_WEIGHTS = {
+    "ghi": 0.6,
+    "import_dependency": 0.4,
+}
+
+
+def apply_chart_style(fig: go.Figure, height: int | None = None, show_legend: bool | None = None) -> go.Figure:
+    layout = {
+        "template": CHART_TEMPLATE,
+        "font": {"family": "Arial, sans-serif", "color": "#263238"},
+        "paper_bgcolor": "rgba(0,0,0,0)",
+        "plot_bgcolor": "rgba(0,0,0,0)",
+        "margin": {"l": 30, "r": 30, "t": 70, "b": 40},
+        "legend_title_text": "",
+    }
+    if height is not None:
+        layout["height"] = height
+    if show_legend is not None:
+        layout["showlegend"] = show_legend
+    fig.update_layout(**layout)
+    fig.update_xaxes(gridcolor="#e6ecef", zerolinecolor="#ccd6dc")
+    fig.update_yaxes(gridcolor="#e6ecef", zerolinecolor="#ccd6dc")
+    return fig
 
 
 def data_path(filename: str) -> Path:
@@ -124,14 +172,22 @@ def add_crisis_bands(fig: go.Figure, yref: str = "paper") -> None:
         fig.add_vrect(
             x0=start,
             x1=end,
-            fillcolor="#d6604d",
-            opacity=0.11,
+            fillcolor=COLORS["crisis"],
+            opacity=0.08,
             line_width=0,
             annotation_text=label,
             annotation_position="top left",
             annotation_font_size=10,
             yref=yref,
         )
+
+
+def minmax_scale(series: pd.Series) -> pd.Series:
+    min_value = series.min()
+    max_value = series.max()
+    if pd.isna(min_value) or pd.isna(max_value) or min_value == max_value:
+        return pd.Series(0.0, index=series.index)
+    return (series - min_value) / (max_value - min_value)
 
 
 def build_vulnerability(ghi: pd.DataFrame, worldbank: pd.DataFrame) -> pd.DataFrame:
@@ -145,8 +201,34 @@ def build_vulnerability(ghi: pd.DataFrame, worldbank: pd.DataFrame) -> pd.DataFr
         .first()[["iso3", "country_wb", "year", "food_import_pct"]]
     )
     vuln = ghi_slim.merge(latest_imports, on="iso3", how="inner")
-    vuln["vulnerability_score"] = vuln["ghi_2025"] * vuln["food_import_pct"]
-    return vuln.sort_values("vulnerability_score", ascending=False)
+    vuln["ghi_norm"] = minmax_scale(vuln["ghi_2025"])
+    vuln["import_dependency_norm"] = minmax_scale(vuln["food_import_pct"])
+    vuln["exposure_index"] = (
+        EXPOSURE_WEIGHTS["ghi"] * vuln["ghi_norm"] + EXPOSURE_WEIGHTS["import_dependency"] * vuln["import_dependency_norm"]
+    ) * 100
+    return vuln.sort_values("exposure_index", ascending=False)
+
+
+def build_ffpi_correlation(master_idx: pd.DataFrame, ffpi_annual: pd.DataFrame) -> pd.DataFrame:
+    price_idx = (
+        master_idx.groupby(["iso3", "country", "year"], as_index=False)["value"]
+        .mean()
+        .rename(columns={"value": "avg_producer_price_index"})
+    )
+    ffpi_cols = ["ffpi_food", "ffpi_cereals", "ffpi_meat", "ffpi_oils", "ffpi_sugar", "ffpi_dairy"]
+    merged = price_idx.merge(ffpi_annual[["year", *ffpi_cols]], on="year", how="inner")
+
+    rows = []
+    for country, group in merged.groupby("country"):
+        for col in ffpi_cols:
+            rows.append(
+                {
+                    "country": country,
+                    "ffpi_index": col.replace("ffpi_", "").title(),
+                    "correlation": group["avg_producer_price_index"].corr(group[col]),
+                }
+            )
+    return pd.DataFrame(rows).dropna(subset=["correlation"])
 
 
 def overview(data: dict[str, pd.DataFrame]) -> None:
@@ -155,7 +237,11 @@ def overview(data: dict[str, pd.DataFrame]) -> None:
     vuln = build_vulnerability(data["ghi"], data["worldbank"])
 
     st.title("FAOSTAT Producer Prices: Shock Exposure Dashboard")
-    st.caption("Australia and New Zealand producer prices, global food price shocks, and import-dependent hunger risk.")
+    st.caption("Australia and New Zealand producer prices, global food price shocks, and hunger-import exposure.")
+    st.write(
+        "Follow the story from supply-side producer prices, to global food price context, "
+        "to countries least able to absorb price pressure."
+    )
 
     year_min = int(master["year"].min())
     year_max = int(master["year"].max())
@@ -178,17 +264,18 @@ def overview(data: dict[str, pd.DataFrame]) -> None:
         y="avg_usd_per_tonne",
         color="iso3",
         text="commodities",
-        color_discrete_map=COLORS,
+        color_discrete_map=COUNTRY_COLORS,
         labels={"avg_usd_per_tonne": "Average producer price (USD/tonne)", "country": ""},
         title="Average Producer Price by Country",
+        template=CHART_TEMPLATE,
     )
     fig.update_traces(texttemplate="%{text} commodities", textposition="outside")
-    fig.update_layout(height=420, showlegend=False)
+    apply_chart_style(fig, height=420, show_legend=False)
     st.plotly_chart(fig, width="stretch")
 
-    st.subheader("Highest Vulnerability Scores")
+    st.subheader("Highest Hunger-Import Exposure")
     st.dataframe(
-        vuln.head(10)[["country_ghi", "ghi_2025", "food_import_pct", "vulnerability_score"]].round(2),
+        vuln.head(10)[["country_ghi", "ghi_2025", "food_import_pct", "exposure_index"]].round(2),
         width="stretch",
         hide_index=True,
     )
@@ -199,6 +286,7 @@ def price_trends(data: dict[str, pd.DataFrame]) -> None:
     ffpi = data["ffpi_annual"]
 
     st.title("Producer Price Trends")
+    st.caption("Start with the supply-side signal: how AUS/NZ commodity prices move through time.")
     items = sorted(master["item"].dropna().unique())
     default_item = "Wheat" if "Wheat" in items else items[0]
     selected_item = st.selectbox("Commodity", items, index=items.index(default_item))
@@ -245,7 +333,8 @@ def price_trends(data: dict[str, pd.DataFrame]) -> None:
         secondary_y=True,
     )
     add_crisis_bands(fig)
-    fig.update_layout(title=f"{selected_item}: AUS/NZ Producer Price vs Global FFPI", height=580)
+    apply_chart_style(fig, height=580)
+    fig.update_layout(title=f"{selected_item}: AUS/NZ Producer Price vs Global FFPI")
     fig.update_xaxes(title_text="Year")
     fig.update_yaxes(title_text="Producer price (USD/tonne)", secondary_y=False)
     fig.update_yaxes(title_text="FFPI food index", secondary_y=True)
@@ -264,6 +353,7 @@ def price_trends(data: dict[str, pd.DataFrame]) -> None:
 def volatility(data: dict[str, pd.DataFrame]) -> None:
     master = data["master_usd"]
     st.title("Commodity Volatility")
+    st.caption("Volatility highlights which commodities have unstable producer prices and may deserve closer monitoring.")
 
     country = st.radio("Country", ["Australia", "New Zealand"], horizontal=True)
     top_n = st.slider("Number of commodities", min_value=5, max_value=30, value=15, step=5)
@@ -280,13 +370,15 @@ def volatility(data: dict[str, pd.DataFrame]) -> None:
         y="item",
         orientation="h",
         color="cv_pct",
-        color_continuous_scale="RdYlGn_r",
+        color_continuous_scale=RISK_SCALE,
         labels={"cv_pct": "Coefficient of variation (%)", "item": ""},
         hover_data={"mean": ":,.0f", "std": ":,.0f", "count": True},
         title=f"{country}: Most Volatile Producer Prices",
+        template=CHART_TEMPLATE,
     )
     fig.add_vline(x=50, line_dash="dash", line_color=COLORS["risk"], annotation_text="50% CV")
-    fig.update_layout(height=max(500, top_n * 28), coloraxis_showscale=False)
+    apply_chart_style(fig, height=max(500, top_n * 28))
+    fig.update_layout(coloraxis_showscale=False)
     st.plotly_chart(fig, width="stretch")
 
 
@@ -294,8 +386,10 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
     ffpi_a = data["ffpi_annual"]
     ffpi_m = data["ffpi_monthly"]
     ghi = data["ghi"]
+    master_idx = data["master_idx"]
 
     st.title("Global Shock and Hunger Context")
+    st.caption("Connect local producer-price movement to global food price shock periods and hunger severity.")
     ffpi_cols = ["ffpi_food", "ffpi_cereals", "ffpi_meat", "ffpi_dairy", "ffpi_oils", "ffpi_sugar"]
     selected = st.multiselect(
         "FFPI indices",
@@ -310,13 +404,41 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
         ffpi_a[ffpi_a["year"] >= 1991],
         x="year",
         y=selected,
+        color_discrete_map=FFPI_COLORS,
         labels={"value": "Index (2014-2016 = 100)", "year": "Year", "variable": "Index"},
         title="FAO Food Price Index Sub-Indices",
+        template=CHART_TEMPLATE,
     )
-    fig.add_hline(y=100, line_dash="dash", line_color="#555555")
+    fig.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
     add_crisis_bands(fig)
-    fig.update_layout(height=520)
+    apply_chart_style(fig, height=520)
     st.plotly_chart(fig, width="stretch")
+
+    st.subheader("AUS/NZ Price Index Alignment with FFPI")
+    corr = build_ffpi_correlation(master_idx, ffpi_a)
+    fig_corr = px.bar(
+        corr.sort_values(["country", "correlation"]),
+        x="correlation",
+        y="ffpi_index",
+        color="country",
+        barmode="group",
+        orientation="h",
+        color_discrete_map=COUNTRY_COLORS,
+        labels={"correlation": "Pearson correlation", "ffpi_index": "FFPI sub-index"},
+        title="Correlation between AUS/NZ Producer Price Index and FFPI Sub-Indices",
+        template=CHART_TEMPLATE,
+    )
+    fig_corr.add_vline(x=0, line_color=COLORS["neutral"])
+    apply_chart_style(fig_corr, height=420)
+    st.plotly_chart(fig_corr, width="stretch")
+
+    crisis_years = [2008, 2011, 2022]
+    crisis = ffpi_a[ffpi_a["year"].isin(crisis_years)].set_index("year")
+    st.subheader("Crisis-Year Price Shock Markers")
+    cols = st.columns(len(crisis_years))
+    for col, year in zip(cols, crisis_years):
+        if year in crisis.index:
+            col.metric(f"{year} FFPI food", f"{crisis.loc[year, 'ffpi_food']:.1f}")
 
     monthly = ffpi_m[ffpi_m["year"] >= 2000].copy()
     fig_monthly = px.area(
@@ -325,10 +447,11 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
         y="ffpi_food",
         labels={"date": "Date", "ffpi_food": "FFPI food"},
         title="Monthly Food Price Shock Timeline",
+        template=CHART_TEMPLATE,
     )
-    fig_monthly.add_hline(y=100, line_dash="dash", line_color="#555555")
-    fig_monthly.update_traces(line_color="#2b2b2b", fillcolor="rgba(178, 24, 43, 0.22)")
-    fig_monthly.update_layout(height=420)
+    fig_monthly.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
+    fig_monthly.update_traces(line_color=COLORS["FFPI"], fillcolor="rgba(159, 58, 56, 0.16)")
+    apply_chart_style(fig_monthly, height=420)
     st.plotly_chart(fig_monthly, width="stretch")
 
     ghi_valid = ghi.dropna(subset=["iso3", "ghi_2025"])
@@ -337,71 +460,159 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
         locations="iso3",
         color="ghi_2025",
         hover_name="country_ghi",
-        color_continuous_scale="YlOrRd",
+        color_continuous_scale=RISK_SCALE,
         labels={"ghi_2025": "GHI 2025"},
         title="Global Hunger Index 2025",
+        template=CHART_TEMPLATE,
     )
-    fig_map.update_layout(height=520, geo_showframe=False, geo_showcoastlines=True)
+    apply_chart_style(fig_map, height=520)
+    fig_map.update_layout(geo_showframe=False, geo_showcoastlines=True, geo_coastlinecolor="#b8c3c9")
     st.plotly_chart(fig_map, width="stretch")
 
 
 def vulnerability(data: dict[str, pd.DataFrame]) -> None:
     vuln = build_vulnerability(data["ghi"], data["worldbank"])
-    st.title("Vulnerability Matrix")
+    st.title("Hunger-Import Exposure Matrix")
 
     shock_pct = st.slider("Producer price shock", min_value=0, max_value=60, value=20, step=5, format="+%d%%")
+    pass_through_pct = st.slider(
+        "Producer-to-import price pass-through",
+        min_value=0,
+        max_value=100,
+        value=25,
+        step=5,
+        format="%d%%",
+        help="Illustrative assumption: only part of a producer-price shock reaches import prices.",
+    )
     vuln = vuln.copy()
-    vuln["implied_cost_increase_pct"] = vuln["food_import_pct"] * shock_pct / 100
+    global_price_pressure_pct = shock_pct * pass_through_pct / 100
+    vuln["implied_import_cost_pressure_pct"] = vuln["food_import_pct"] * global_price_pressure_pct / 100
+    vuln["scenario_pressure_score"] = vuln["exposure_index"] * vuln["implied_import_cost_pressure_pct"] / 100
+
+    highest = vuln.iloc[0]
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Highest exposure", highest["country_ghi"], f"{highest['exposure_index']:.1f}/100")
+    c2.metric("Producer shock", f"+{shock_pct}%")
+    c3.metric("Pass-through", f"{pass_through_pct}%")
+    c4.metric("Global pressure assumption", f"{global_price_pressure_pct:.1f}%")
 
     st.caption(
-        "The dots stay in the same x/y position because GHI and food import dependency are baseline indicators. "
-        "The slider changes the scenario impact, shown by dot colour and the what-if ranking below."
+        "This is an exposure index, not a bilateral AUS/NZ trade-flow model. "
+        "Dots stay in the same x/y position because GHI and food import dependency are baseline indicators; "
+        "the sliders change the illustrative scenario pressure shown by colour and the ranking below."
     )
+
+    with st.expander("Methodology and caveats", expanded=False):
+        st.markdown(
+            """
+            **Exposure index**
+
+            `exposure_index = (0.60 x minmax(GHI 2025) + 0.40 x minmax(food import dependency)) x 100`
+
+            **Scenario pressure**
+
+            `global_price_pressure = producer_price_shock x pass_through_rate`
+
+            `scenario_pressure_score = exposure_index x implied_import_cost_pressure / 100`
+
+            This is not a bilateral AUS/NZ trade-flow model. It does not estimate exchange-rate effects,
+            freight costs, tariffs, subsidies, or supplier substitution. It is a prioritisation tool for
+            identifying countries structurally exposed to global food-price stress.
+            """
+        )
 
     x_med = vuln["ghi_2025"].median()
     y_med = vuln["food_import_pct"].median()
-    max_scenario_cost = data["worldbank"]["food_import_pct"].max() * 0.6
+    max_scenario_pressure = data["worldbank"]["food_import_pct"].max() * 0.6
     fig = px.scatter(
         vuln,
         x="ghi_2025",
         y="food_import_pct",
-        size="vulnerability_score",
-        color="implied_cost_increase_pct",
+        size="exposure_index",
+        color="implied_import_cost_pressure_pct",
         hover_name="country_ghi",
         hover_data={
             "ghi_2025": ":.1f",
             "food_import_pct": ":.1f",
-            "vulnerability_score": ":.1f",
-            "implied_cost_increase_pct": ":.1f",
+            "exposure_index": ":.1f",
+            "implied_import_cost_pressure_pct": ":.2f",
+            "scenario_pressure_score": ":.2f",
         },
-        color_continuous_scale="YlOrRd",
-        range_color=[0, max_scenario_cost],
+        color_continuous_scale=RISK_SCALE,
+        range_color=[0, max_scenario_pressure],
         labels={
             "ghi_2025": "GHI score 2025",
             "food_import_pct": "Food imports (% of merchandise imports)",
-            "vulnerability_score": "Vulnerability score",
-            "implied_cost_increase_pct": "Implied cost increase (%)",
+            "exposure_index": "Hunger-import exposure index",
+            "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)",
+            "scenario_pressure_score": "Scenario pressure score",
         },
-        title=f"Hunger Severity x Food Import Dependency under +{shock_pct}% Price Shock",
+        title=(
+            "Hunger Severity x Food Import Dependency "
+            f"under +{shock_pct}% Producer Shock and {pass_through_pct}% Pass-through"
+        ),
+        template=CHART_TEMPLATE,
     )
-    fig.add_vline(x=x_med, line_dash="dash", line_color="#777777")
-    fig.add_hline(y=y_med, line_dash="dash", line_color="#777777")
-    fig.update_layout(height=620)
+    fig.add_vline(x=x_med, line_dash="dash", line_color=COLORS["neutral"])
+    fig.add_hline(y=y_med, line_dash="dash", line_color=COLORS["neutral"])
+    apply_chart_style(fig, height=620)
     st.plotly_chart(fig, width="stretch")
 
-    top = vuln.nlargest(15, "implied_cost_increase_pct").sort_values("implied_cost_increase_pct")
+    top = vuln.nlargest(15, "scenario_pressure_score").sort_values("scenario_pressure_score")
     fig_bar = px.bar(
         top,
-        x="implied_cost_increase_pct",
+        x="scenario_pressure_score",
         y="country_ghi",
         orientation="h",
-        color="ghi_2025",
-        color_continuous_scale="YlOrRd",
-        labels={"implied_cost_increase_pct": "Implied food cost increase (%)", "country_ghi": ""},
-        title=f"What-if Scenario: +{shock_pct}% AUS/NZ Producer Price Shock",
+        color="exposure_index",
+        color_continuous_scale=RISK_SCALE,
+        hover_data={
+            "ghi_2025": ":.1f",
+            "food_import_pct": ":.1f",
+            "implied_import_cost_pressure_pct": ":.2f",
+        },
+        labels={
+            "scenario_pressure_score": "Scenario pressure score",
+            "country_ghi": "",
+            "exposure_index": "Exposure index",
+        },
+        title=(
+            "Illustrative What-if Ranking: "
+            f"+{shock_pct}% Producer Shock x {pass_through_pct}% Pass-through"
+        ),
+        template=CHART_TEMPLATE,
     )
-    fig_bar.update_layout(height=560)
+    apply_chart_style(fig_bar, height=560)
     st.plotly_chart(fig_bar, width="stretch")
+
+    st.subheader("Country Deep Dive")
+    country = st.selectbox("Inspect a country", vuln["country_ghi"].tolist())
+    selected = vuln[vuln["country_ghi"] == country].iloc[0]
+    d1, d2, d3, d4 = st.columns(4)
+    d1.metric("GHI 2025", f"{selected['ghi_2025']:.1f}")
+    d2.metric("Food import dependency", f"{selected['food_import_pct']:.1f}%")
+    d3.metric("Exposure index", f"{selected['exposure_index']:.1f}/100")
+    d4.metric("Scenario pressure", f"{selected['scenario_pressure_score']:.2f}")
+
+    trend_cols = ["ghi_2000", "ghi_2008", "ghi_2016", "ghi_2025"]
+    trend = pd.DataFrame(
+        {
+            "year": [2000, 2008, 2016, 2025],
+            "ghi_score": [selected[col] for col in trend_cols],
+        }
+    ).dropna()
+    fig_trend = px.line(
+        trend,
+        x="year",
+        y="ghi_score",
+        markers=True,
+        labels={"year": "Year", "ghi_score": "GHI score"},
+        title=f"{country}: Hunger Score Trend",
+        template=CHART_TEMPLATE,
+    )
+    fig_trend.update_traces(line_color=COLORS["risk"], marker_color=COLORS["risk"])
+    apply_chart_style(fig_trend, height=340)
+    st.plotly_chart(fig_trend, width="stretch")
 
 
 def data_explorer(data: dict[str, pd.DataFrame]) -> None:
@@ -488,7 +699,7 @@ def main() -> None:
                 "Price Trends",
                 "Volatility",
                 "Global Context",
-                "Vulnerability",
+                "Exposure Matrix",
                 "Live FAOSTAT",
                 "Data Explorer",
             ],
@@ -504,7 +715,7 @@ def main() -> None:
         "Price Trends": price_trends,
         "Volatility": volatility,
         "Global Context": global_context,
-        "Vulnerability": vulnerability,
+        "Exposure Matrix": vulnerability,
         "Live FAOSTAT": live_faostat,
         "Data Explorer": data_explorer,
     }
