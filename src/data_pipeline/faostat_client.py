@@ -26,16 +26,23 @@ class FaostatApiError(RuntimeError):
     """Raised when the FAOSTAT API returns an error response."""
 
 
-def get_access_token() -> str:
+def get_access_token(access_token: str | None = None) -> str:
+    if access_token:
+        return access_token.strip()
     load_dotenv(ROOT_DIR / ".env")
     token = os.getenv("FAOSTAT_ACCESS_TOKEN", "").strip()
     if not token:
-        raise FaostatApiError("Set FAOSTAT_ACCESS_TOKEN in your environment or .env file.")
+        raise FaostatApiError("Set FAOSTAT_ACCESS_TOKEN in your environment, .env file, or Streamlit token input.")
     return token
 
 
-def faostat_get(path: str, params: Any | None = None, language: str = "en") -> dict[str, Any]:
-    token = get_access_token()
+def faostat_get(
+    path: str,
+    params: Any | None = None,
+    language: str = "en",
+    access_token: str | None = None,
+) -> dict[str, Any]:
+    token = get_access_token(access_token)
     clean_path = path.strip("/")
     if not clean_path.startswith(f"{language}/"):
         clean_path = f"{language}/{clean_path}"
@@ -51,8 +58,13 @@ def faostat_get(path: str, params: Any | None = None, language: str = "en") -> d
     return response.json()
 
 
-def faostat_get_csv(path: str, params: Any | None = None, language: str = "en") -> pd.DataFrame:
-    token = get_access_token()
+def faostat_get_csv(
+    path: str,
+    params: Any | None = None,
+    language: str = "en",
+    access_token: str | None = None,
+) -> pd.DataFrame:
+    token = get_access_token(access_token)
     clean_path = path.strip("/")
     if not clean_path.startswith(f"{language}/"):
         clean_path = f"{language}/{clean_path}"
@@ -79,29 +91,45 @@ def response_to_dataframe(payload: dict[str, Any]) -> pd.DataFrame:
     return pd.json_normalize(payload)
 
 
-def get_groups_and_domains(language: str = "en") -> pd.DataFrame:
-    payload = faostat_get("groupsanddomains", language=language)
+def get_groups_and_domains(language: str = "en", access_token: str | None = None) -> pd.DataFrame:
+    payload = faostat_get("groupsanddomains", language=language, access_token=access_token)
     return response_to_dataframe(payload)
 
 
-def get_domain_data(domain: str, params: Any, language: str = "en") -> pd.DataFrame:
+def get_domain_data(
+    domain: str,
+    params: Any,
+    language: str = "en",
+    access_token: str | None = None,
+) -> pd.DataFrame:
     if params is None:
         params = []
     if isinstance(params, dict):
         params = list(params.items())
     if ("output_type", "csv") not in params:
         params = [*params, ("output_type", "csv")]
-    return faostat_get_csv(f"data/{domain}", params=params, language=language)
+    return faostat_get_csv(f"data/{domain}", params=params, language=language, access_token=access_token)
 
 
-def get_domain_json_data(domain: str, params: Any, language: str = "en") -> pd.DataFrame:
-    payload = faostat_get(f"data/{domain}", params=params, language=language)
+def get_domain_json_data(
+    domain: str,
+    params: Any,
+    language: str = "en",
+    access_token: str | None = None,
+) -> pd.DataFrame:
+    payload = faostat_get(f"data/{domain}", params=params, language=language, access_token=access_token)
     return response_to_dataframe(payload)
 
 
-def save_domain_data(domain: str, params: Any, output_path: Path, language: str = "en") -> Path:
+def save_domain_data(
+    domain: str,
+    params: Any,
+    output_path: Path,
+    language: str = "en",
+    access_token: str | None = None,
+) -> Path:
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    df = get_domain_data(domain=domain, params=params, language=language)
+    df = get_domain_data(domain=domain, params=params, language=language, access_token=access_token)
     df.to_csv(output_path, index=False)
     return output_path
 

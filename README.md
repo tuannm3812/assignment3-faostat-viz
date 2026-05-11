@@ -145,7 +145,19 @@ Streamlit will print a local URL, usually `http://localhost:8501`.
 
 ## FAOSTAT API Access
 
-The API client reads your token from `.env` or the active shell environment. Do not commit real tokens.
+The dashboard supports two safe ways to use a FAOSTAT token. Do not commit real tokens.
+
+### Option 1: Paste Token in Streamlit
+
+Open the `Live FAOSTAT` page and paste a current token into the `FAOSTAT access token` field. The field is password-style and is only used for the current Streamlit session.
+
+Get a token from the [FAOSTAT Developer Portal](https://www.fao.org/faostat/en/#developer-portal). Tokens are short-lived, so refresh the token if the API request starts failing.
+
+This is the easiest option for deployed demos because teammates do not need to create a local `.env` file.
+
+### Option 2: Local `.env`
+
+The API client also reads your token from `.env` or the active shell environment.
 
 Create a local `.env` file from the example:
 
@@ -213,7 +225,7 @@ Both notebooks resolve the repository root automatically, so they can be run fro
 - `Volatility`: highest coefficient-of-variation commodities by country.
 - `Global Context`: FFPI annual and monthly shock timelines plus GHI choropleth.
 - `Exposure Matrix`: hunger-import exposure matrix and what-if shock scenario with producer-to-import pass-through.
-- `Live FAOSTAT`: realtime Producer Prices API preview using your local `FAOSTAT_ACCESS_TOKEN`.
+- `Live FAOSTAT`: realtime Producer Prices API preview using a pasted session token or local `FAOSTAT_ACCESS_TOKEN`.
 - `Data Explorer`: inspect the local CSV tables.
 
 ## Assessment Documents

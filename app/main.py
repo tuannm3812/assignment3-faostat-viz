@@ -36,11 +36,11 @@ CRISIS_PERIODS = [
 
 COLORS = {
     "AUS": "#2f6f9f",
-    "NZL": "#9a6b2f",
-    "FFPI": "#4f5b62",
-    "risk": "#9f3a38",
-    "crisis": "#9f3a38",
-    "neutral": "#7a858c",
+    "NZL": "#b8552f",
+    "FFPI": "#4d4d4d",
+    "risk": "#b2182b",
+    "crisis": "#b2182b",
+    "neutral": "#777777",
 }
 
 CHART_TEMPLATE = "plotly_white"
@@ -51,9 +51,9 @@ COUNTRY_COLORS = {
     "New Zealand": COLORS["NZL"],
 }
 FFPI_COLORS = {
-    "ffpi_food": "#4f5b62",
+    "ffpi_food": "#4d4d4d",
     "ffpi_cereals": "#7b8f55",
-    "ffpi_meat": "#9a6b2f",
+    "ffpi_meat": "#b8552f",
     "ffpi_dairy": "#6f7f94",
     "ffpi_oils": "#8b6f8f",
     "ffpi_sugar": "#a75d4f",
@@ -62,7 +62,7 @@ RISK_SCALE = [
     [0.00, "#edf3f1"],
     [0.35, "#a8c5b5"],
     [0.70, "#c9955c"],
-    [1.00, "#9f3a38"],
+    [1.00, "#b2182b"],
 ]
 
 EXPOSURE_WEIGHTS = {
@@ -74,7 +74,7 @@ EXPOSURE_WEIGHTS = {
 def apply_chart_style(fig: go.Figure, height: int | None = None, show_legend: bool | None = None) -> go.Figure:
     layout = {
         "template": CHART_TEMPLATE,
-        "font": {"family": "Arial, sans-serif", "color": "#263238"},
+        "font": {"family": "Source Sans Pro, Arial, sans-serif"},
         "paper_bgcolor": "rgba(0,0,0,0)",
         "plot_bgcolor": "rgba(0,0,0,0)",
         "margin": {"l": 30, "r": 30, "t": 70, "b": 40},
@@ -85,8 +85,8 @@ def apply_chart_style(fig: go.Figure, height: int | None = None, show_legend: bo
     if show_legend is not None:
         layout["showlegend"] = show_legend
     fig.update_layout(**layout)
-    fig.update_xaxes(gridcolor="#e6ecef", zerolinecolor="#ccd6dc")
-    fig.update_yaxes(gridcolor="#e6ecef", zerolinecolor="#ccd6dc")
+    fig.update_xaxes(gridcolor="rgba(127,127,127,0.22)", zerolinecolor="rgba(127,127,127,0.25)")
+    fig.update_yaxes(gridcolor="rgba(127,127,127,0.22)", zerolinecolor="rgba(127,127,127,0.25)")
     return fig
 
 
@@ -269,14 +269,20 @@ def overview(data: dict[str, pd.DataFrame]) -> None:
         title="Average Producer Price by Country",
         template=CHART_TEMPLATE,
     )
-    fig.update_traces(texttemplate="%{text} commodities", textposition="outside")
+    fig.update_traces(
+        marker_line_color="rgba(255,255,255,0.24)",
+        marker_line_width=1,
+        textfont_color=COLORS["neutral"],
+        texttemplate="%{text} commodities",
+        textposition="outside",
+    )
     apply_chart_style(fig, height=420, show_legend=False)
     st.plotly_chart(fig, width="stretch")
 
     st.subheader("Highest Hunger-Import Exposure")
     st.dataframe(
         vuln.head(10)[["country_ghi", "ghi_2025", "food_import_pct", "exposure_index"]].round(2),
-        width="stretch",
+        use_container_width=True,
         hide_index=True,
     )
 
@@ -345,7 +351,7 @@ def price_trends(data: dict[str, pd.DataFrame]) -> None:
         st.subheader("Flagged Outlier Observations")
         st.dataframe(
             outliers[["country", "item", "year", "value", "flag_description"]].sort_values("year"),
-            width="stretch",
+            use_container_width=True,
             hide_index=True,
         )
 
@@ -450,7 +456,7 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
         template=CHART_TEMPLATE,
     )
     fig_monthly.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
-    fig_monthly.update_traces(line_color=COLORS["FFPI"], fillcolor="rgba(159, 58, 56, 0.16)")
+    fig_monthly.update_traces(line_color=COLORS["FFPI"], fillcolor="rgba(178, 24, 43, 0.16)")
     apply_chart_style(fig_monthly, height=420)
     st.plotly_chart(fig_monthly, width="stretch")
 
@@ -499,7 +505,8 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
     st.caption(
         "This is an exposure index, not a bilateral AUS/NZ trade-flow model. "
         "Dots stay in the same x/y position because GHI and food import dependency are baseline indicators; "
-        "the sliders change the illustrative scenario pressure shown by colour and the ranking below."
+        "the sliders change the illustrative scenario pressure shown by bubble size, colour, and bar length. "
+        "The country order may stay similar because the shock is applied as a shared global multiplier."
     )
 
     with st.expander("Methodology and caveats", expanded=False):
@@ -523,18 +530,26 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
 
     x_med = vuln["ghi_2025"].median()
     y_med = vuln["food_import_pct"].median()
-    max_scenario_pressure = data["worldbank"]["food_import_pct"].max() * 0.6
+    max_possible_global_pressure_pct = 60
+    max_scenario_pressure = max(data["worldbank"]["food_import_pct"].max() * max_possible_global_pressure_pct / 100, 1)
+    vuln["scenario_bubble_size"] = vuln["scenario_pressure_score"].clip(lower=0.02)
+    max_scenario_score = max(
+        (vuln["exposure_index"] * vuln["food_import_pct"] * max_possible_global_pressure_pct / 10000).max(),
+        1,
+    )
     fig = px.scatter(
         vuln,
         x="ghi_2025",
         y="food_import_pct",
-        size="exposure_index",
+        size="scenario_bubble_size",
+        size_max=28,
         color="implied_import_cost_pressure_pct",
         hover_name="country_ghi",
         hover_data={
             "ghi_2025": ":.1f",
             "food_import_pct": ":.1f",
             "exposure_index": ":.1f",
+            "scenario_bubble_size": False,
             "implied_import_cost_pressure_pct": ":.2f",
             "scenario_pressure_score": ":.2f",
         },
@@ -544,6 +559,7 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
             "ghi_2025": "GHI score 2025",
             "food_import_pct": "Food imports (% of merchandise imports)",
             "exposure_index": "Hunger-import exposure index",
+            "scenario_bubble_size": "Scenario pressure score",
             "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)",
             "scenario_pressure_score": "Scenario pressure score",
         },
@@ -555,6 +571,7 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
     )
     fig.add_vline(x=x_med, line_dash="dash", line_color=COLORS["neutral"])
     fig.add_hline(y=y_med, line_dash="dash", line_color=COLORS["neutral"])
+    fig.update_traces(marker={"line": {"color": "rgba(255,255,255,0.42)", "width": 0.8}, "opacity": 0.9})
     apply_chart_style(fig, height=620)
     st.plotly_chart(fig, width="stretch")
 
@@ -564,11 +581,13 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
         x="scenario_pressure_score",
         y="country_ghi",
         orientation="h",
-        color="exposure_index",
+        color="scenario_pressure_score",
         color_continuous_scale=RISK_SCALE,
+        range_color=[0, max_scenario_score],
         hover_data={
             "ghi_2025": ":.1f",
             "food_import_pct": ":.1f",
+            "exposure_index": ":.1f",
             "implied_import_cost_pressure_pct": ":.2f",
         },
         labels={
@@ -582,6 +601,8 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
         ),
         template=CHART_TEMPLATE,
     )
+    fig_bar.update_traces(marker_line_color="rgba(255,255,255,0.22)", marker_line_width=0.8)
+    fig_bar.update_xaxes(range=[0, max_scenario_score])
     apply_chart_style(fig_bar, height=560)
     st.plotly_chart(fig_bar, width="stretch")
 
@@ -628,12 +649,12 @@ def data_explorer(data: dict[str, pd.DataFrame]) -> None:
     label = st.selectbox("Dataset", list(label_to_key))
     df = data[label_to_key[label]]
     st.caption(f"{len(df):,} rows x {df.shape[1]:,} columns")
-    st.dataframe(df, width="stretch", hide_index=True)
+    st.dataframe(df, use_container_width=True, hide_index=True)
 
 
 @st.cache_data(show_spinner=False, ttl=3600)
-def load_live_faostat_pp(params: tuple[tuple[str, str], ...]) -> pd.DataFrame:
-    return get_domain_data("PP", list(params))
+def load_live_faostat_pp(params: tuple[tuple[str, str], ...], access_token: str | None) -> pd.DataFrame:
+    return get_domain_data("PP", list(params), access_token=access_token)
 
 
 def live_faostat(data: dict[str, pd.DataFrame]) -> None:
@@ -642,6 +663,19 @@ def live_faostat(data: dict[str, pd.DataFrame]) -> None:
         "This page calls the FAOSTAT Producer Prices API directly. "
         "The main dashboard still uses cleaned local files in data/processed."
     )
+    st.info("Paste a temporary FAOSTAT token here for demos, or leave it blank to use `FAOSTAT_ACCESS_TOKEN` from `.env`.")
+    st.markdown(
+        "Get a token from the [FAOSTAT Developer Portal](https://www.fao.org/faostat/en/#developer-portal). "
+        "Tokens are short-lived, so refresh it if a request starts failing."
+    )
+
+    access_token = st.text_input(
+        "FAOSTAT access token",
+        type="password",
+        placeholder="Bearer token from FAOSTAT Developer Portal",
+        help="Stored only in the current Streamlit session. Do not paste tokens into code, README, or commits.",
+    ).strip()
+    token_for_request = access_token or None
 
     col1, col2 = st.columns(2)
     with col1:
@@ -673,17 +707,17 @@ def live_faostat(data: dict[str, pd.DataFrame]) -> None:
 
     if st.button("Fetch Live FAOSTAT Data", type="primary"):
         try:
-            live_df = load_live_faostat_pp(params)
+            live_df = load_live_faostat_pp(params, token_for_request)
         except FaostatApiError as exc:
             st.error(str(exc))
-            st.info("Add a current FAOSTAT_ACCESS_TOKEN to your local .env file. Do not commit real tokens.")
+            st.info("Paste a current token above or set FAOSTAT_ACCESS_TOKEN in your local .env file.")
             return
         except Exception as exc:
             st.error(f"Could not fetch FAOSTAT data: {exc}")
             return
 
         st.success(f"Fetched {len(live_df):,} rows from FAOSTAT.")
-        st.dataframe(live_df, width="stretch", hide_index=True)
+        st.dataframe(live_df, use_container_width=True, hide_index=True)
 
 
 def main() -> None:
