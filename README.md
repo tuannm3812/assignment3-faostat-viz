@@ -27,7 +27,7 @@ The main analytical layers are:
 - Commodity volatility using coefficient of variation.
 - Global FAO Food Price Index shock context.
 - Global Hunger Index context.
-- Vulnerability matrix combining hunger severity and food import dependency.
+- Hunger-import exposure matrix combining hunger severity and food import dependency.
 - What-if scenario slider for producer price shocks.
 
 ## Data Scope and Enrichment Logic
@@ -37,10 +37,46 @@ The primary FAOSTAT dataset is intentionally focused on **Australia and New Zeal
 The enrichment datasets add the demand-side and global-risk context:
 
 - **FAO Food Price Index (FFPI)** is joined by `year` to show whether AUS/NZ producer price movements align with global food price shocks such as 2007-2008, 2010-2011, and 2022.
-- **Global Hunger Index (GHI)** is used as a global vulnerability layer. AUS and NZL are high-income countries and do not have meaningful GHI scores in this dataset, so GHI is not expected to enrich AUS/NZ rows directly. Instead, it powers the global hunger map and vulnerability matrix.
+- **Global Hunger Index (GHI)** is used as a global vulnerability layer. AUS and NZL are high-income countries and do not have meaningful GHI scores in this dataset, so GHI is not expected to enrich AUS/NZ rows directly. Instead, it powers the global hunger map and exposure matrix.
 - **World Bank food import dependency** measures how exposed countries are to international food-price changes. Combined with GHI, it identifies countries that may be less able to absorb price shocks.
 
 This means the project links supply-side price shocks from AUS/NZ with global exposure indicators from GHI and World Bank data. A future extension could expand the FAOSTAT producer-price pull to more exporting countries, but the current scope keeps the narrative focused and easier to interpret.
+
+## Exposure Index Methodology
+
+Earlier prototypes used a simple multiplication of `GHI score x food import %`. We replaced that with a normalized weighted index because the two variables are on different scales and should not be assumed to compound equally.
+
+Current method:
+
+```text
+ghi_norm = min-max scaled GHI 2025 score
+import_norm = min-max scaled latest food imports as % of merchandise imports
+
+hunger_import_exposure_index = (0.60 x ghi_norm + 0.40 x import_norm) x 100
+```
+
+Rationale:
+
+- GHI receives the higher weight because hunger severity is the direct human-centered risk.
+- Food import dependency receives a lower weight because it is an exposure pathway, not proof of food insecurity by itself.
+- Min-max scaling puts both inputs on the same 0-1 scale before combining them.
+
+The what-if scenario is also treated as illustrative rather than causal:
+
+```text
+global_price_pressure = producer_price_shock x pass_through_rate
+implied_import_cost_pressure = food_import_pct x global_price_pressure / 100
+scenario_pressure_score = exposure_index x implied_import_cost_pressure / 100
+```
+
+The pass-through rate is controlled in the dashboard because producer prices do not translate directly into import prices. Shipping costs, exchange rates, trade margins, policy buffers, and supplier substitution can all absorb or amplify shocks.
+
+Important caveats:
+
+- The model does **not** use bilateral trade-flow data, so it does not prove that a specific country imports food from Australia or New Zealand.
+- The model does **not** estimate exchange-rate effects, freight costs, tariffs, subsidies, or supply substitution.
+- The exposure index identifies countries that are structurally vulnerable to global food-price stress, not countries directly dependent on AUS/NZ supply.
+- Results should be interpreted as a prioritization and storytelling tool, not as a causal economic forecast.
 
 ## Repository Structure
 
@@ -176,9 +212,15 @@ Both notebooks resolve the repository root automatically, so they can be run fro
 - `Price Trends`: selectable commodity time series for Australia/New Zealand with FFPI overlay and crisis-year bands.
 - `Volatility`: highest coefficient-of-variation commodities by country.
 - `Global Context`: FFPI annual and monthly shock timelines plus GHI choropleth.
-- `Vulnerability`: GHI x food import dependency scatter and what-if shock scenario.
+- `Exposure Matrix`: hunger-import exposure matrix and what-if shock scenario with producer-to-import pass-through.
 - `Live FAOSTAT`: realtime Producer Prices API preview using your local `FAOSTAT_ACCESS_TOKEN`.
 - `Data Explorer`: inspect the local CSV tables.
+
+## Assessment Documents
+
+- [Part 2 Persuasion Pitch](docs/part2_persuasion_pitch.md)
+- [Part 3 Final Portfolio Plan](docs/part3_final_portfolio.md)
+- [Team To-Do List](docs/team_todo.md)
 
 ## Next API Step
 
