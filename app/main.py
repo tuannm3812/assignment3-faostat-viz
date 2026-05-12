@@ -7,6 +7,7 @@ import pandas as pd
 import plotly.express as px
 import plotly.graph_objects as go
 import streamlit as st
+from openpyxl import load_workbook
 from plotly.subplots import make_subplots
 
 
@@ -190,6 +191,40 @@ def minmax_scale(series: pd.Series) -> pd.Series:
     return (series - min_value) / (max_value - min_value)
 
 
+def safe_float(value: object) -> float | None:
+    if isinstance(value, str):
+        value = value.replace("<", "").strip()
+    try:
+        return float(value)
+    except (TypeError, ValueError):
+        return None
+
+
+@st.cache_data(show_spinner=False)
+def load_ghi_indicators() -> pd.DataFrame:
+    path = data_path("global_hunger_index.xlsx")
+    if not path.exists():
+        return pd.DataFrame()
+
+    workbook = load_workbook(path, read_only=True, data_only=True)
+    sheet = workbook["GHI Indicator Values 2025"]
+    rows = []
+    for row in sheet.iter_rows(min_row=4, values_only=True):
+        country = row[0]
+        if country is None or len(str(country)) > 60:
+            continue
+        rows.append(
+            {
+                "country_ghi": country,
+                "undernourishment_2024": safe_float(row[4]),
+                "child_wasting_2024": safe_float(row[11]),
+                "child_stunting_2024": safe_float(row[16]),
+                "child_mortality_2023": safe_float(row[20]),
+            }
+        )
+    return pd.DataFrame(rows)
+
+
 def build_vulnerability(ghi: pd.DataFrame, worldbank: pd.DataFrame) -> pd.DataFrame:
     ghi_slim = ghi[["iso3", "country_ghi", "ghi_2000", "ghi_2008", "ghi_2016", "ghi_2025"]].dropna(
         subset=["iso3", "ghi_2025"]
@@ -207,6 +242,40 @@ def build_vulnerability(ghi: pd.DataFrame, worldbank: pd.DataFrame) -> pd.DataFr
         EXPOSURE_WEIGHTS["ghi"] * vuln["ghi_norm"] + EXPOSURE_WEIGHTS["import_dependency"] * vuln["import_dependency_norm"]
     ) * 100
     return vuln.sort_values("exposure_index", ascending=False)
+
+
+def build_undernourishment_exposure(ghi: pd.DataFrame, worldbank: pd.DataFrame) -> pd.DataFrame:
+    indicators = load_ghi_indicators()
+    if indicators.empty:
+        return build_vulnerability(ghi, worldbank)
+
+    ghi_slim = ghi[["iso3", "country_ghi", "ghi_2000", "ghi_2008", "ghi_2016", "ghi_2025"]].dropna(
+        subset=["iso3", "ghi_2025"]
+    )
+    latest_imports = (
+        worldbank.dropna(subset=["food_import_pct"])
+        .sort_values("year", ascending=False)
+        .groupby("iso3", as_index=False)
+        .first()[["iso3", "country_wb", "year", "food_import_pct"]]
+    )
+    exposure = ghi_slim.merge(indicators, on="country_ghi", how="left").merge(latest_imports, on="iso3", how="inner")
+    hunger_source = "undernourishment_2024"
+    if exposure[hunger_source].notna().sum() < 10:
+        exposure[hunger_source] = exposure["ghi_2025"]
+        hunger_source = "ghi_2025"
+
+    exposure[hunger_source] = exposure[hunger_source].fillna(exposure[hunger_source].median())
+    exposure["hunger_metric"] = exposure[hunger_source]
+    exposure["hunger_metric_label"] = (
+        "Undernourishment 2022-24 (% population)" if hunger_source == "undernourishment_2024" else "GHI score 2025"
+    )
+    exposure["hunger_norm"] = minmax_scale(exposure["hunger_metric"])
+    exposure["import_dependency_norm"] = minmax_scale(exposure["food_import_pct"])
+    exposure["exposure_index"] = (
+        EXPOSURE_WEIGHTS["ghi"] * exposure["hunger_norm"]
+        + EXPOSURE_WEIGHTS["import_dependency"] * exposure["import_dependency_norm"]
+    ) * 100
+    return exposure.sort_values("exposure_index", ascending=False)
 
 
 def build_ffpi_correlation(master_idx: pd.DataFrame, ffpi_annual: pd.DataFrame) -> pd.DataFrame:
@@ -229,6 +298,154 @@ def build_ffpi_correlation(master_idx: pd.DataFrame, ffpi_annual: pd.DataFrame) 
                 }
             )
     return pd.DataFrame(rows).dropna(subset=["correlation"])
+
+
+def build_wheat_signal(master_usd: pd.DataFrame, ffpi_annual: pd.DataFrame) -> pd.DataFrame:
+    wheat = master_usd[master_usd["item"].eq("Wheat")].copy()
+    if wheat.empty:
+        return pd.DataFrame()
+    wheat = wheat.merge(ffpi_annual[["year", "ffpi_food"]], on="year", how="left", suffixes=("", "_annual"))
+    if "ffpi_food_annual" in wheat.columns:
+        wheat["ffpi_food"] = wheat["ffpi_food_annual"].fillna(wheat["ffpi_food"])
+    return wheat.sort_values(["country", "year"])
+
+
+def pitch_brief(data: dict[str, pd.DataFrame]) -> None:
+    st.title("Part 2 Pitch Brief")
+    st.caption("A presentation-ready path through the dashboard: what changed, who is exposed, and what to do next.")
+
+    ffpi = data["ffpi_annual"]
+    wheat = build_wheat_signal(data["master_usd"], ffpi)
+    exposure = build_undernourishment_exposure(data["ghi"], data["worldbank"])
+
+    st.subheader("1. The Shock Context: Three Global Price Surges")
+    st.write(
+        "This visual supports the opening claim: food price shocks are global, but their consequences are uneven."
+    )
+    fig_ffpi = px.line(
+        ffpi[ffpi["year"] >= 1991],
+        x="year",
+        y=["ffpi_food", "ffpi_cereals", "ffpi_oils", "ffpi_sugar"],
+        color_discrete_map=FFPI_COLORS,
+        labels={"value": "Index (2014-2016 = 100)", "variable": "Index"},
+        title="FAO Food Price Index: shock periods since 1991",
+        template=CHART_TEMPLATE,
+    )
+    fig_ffpi.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
+    add_crisis_bands(fig_ffpi)
+    apply_chart_style(fig_ffpi, height=430)
+    st.plotly_chart(fig_ffpi, width="stretch")
+
+    st.subheader("2. The Local Signal: Wheat Connects AUS/NZ to the Global Story")
+    st.write(
+        "We added this as a pitch visual because wheat is easy to understand, globally important, and visible in the crisis periods."
+    )
+    if not wheat.empty:
+        fig_wheat = make_subplots(specs=[[{"secondary_y": True}]])
+        for country, color in [("Australia", COLORS["AUS"]), ("New Zealand", COLORS["NZL"])]:
+            country_df = wheat[wheat["country"] == country]
+            if country_df.empty:
+                continue
+            fig_wheat.add_trace(
+                go.Scatter(
+                    x=country_df["year"],
+                    y=country_df["value"],
+                    mode="lines+markers",
+                    name=f"{country} wheat",
+                    line={"color": color, "width": 3},
+                    hovertemplate="<b>%{fullData.name}</b><br>Year %{x}<br>USD/tonne: $%{y:,.0f}<extra></extra>",
+                ),
+                secondary_y=False,
+            )
+        ffpi_plot = ffpi[["year", "ffpi_food"]].dropna()
+        fig_wheat.add_trace(
+            go.Scatter(
+                x=ffpi_plot["year"],
+                y=ffpi_plot["ffpi_food"],
+                mode="lines",
+                name="Global FFPI",
+                line={"color": COLORS["FFPI"], "width": 2, "dash": "dot"},
+            ),
+            secondary_y=True,
+        )
+        add_crisis_bands(fig_wheat)
+        apply_chart_style(fig_wheat, height=470)
+        fig_wheat.update_layout(title="Wheat Producer Prices vs Global Food Price Index")
+        fig_wheat.update_yaxes(title_text="Wheat producer price (USD/tonne)", secondary_y=False)
+        fig_wheat.update_yaxes(title_text="FFPI food index", secondary_y=True)
+        st.plotly_chart(fig_wheat, width="stretch")
+    else:
+        st.info("Wheat is not available in the current producer-price file.")
+
+    st.subheader("3. The Human Lens: Hunger-Import Exposure")
+    st.write(
+        "This improves the deck's vulnerability argument by using undernourishment where available, not just the broad GHI score."
+    )
+    x_label = exposure["hunger_metric_label"].iloc[0] if "hunger_metric_label" in exposure else "GHI score 2025"
+    fig_exposure = px.scatter(
+        exposure,
+        x="hunger_metric" if "hunger_metric" in exposure else "ghi_2025",
+        y="food_import_pct",
+        color="exposure_index",
+        size="exposure_index",
+        size_max=24,
+        hover_name="country_ghi",
+        hover_data={"food_import_pct": ":.1f", "exposure_index": ":.1f", "ghi_2025": ":.1f"},
+        color_continuous_scale=RISK_SCALE,
+        labels={
+            "hunger_metric": x_label,
+            "food_import_pct": "Food imports (% of merchandise imports)",
+            "exposure_index": "Exposure index",
+        },
+        title="Countries Facing Both Food-Access Stress and Import Exposure",
+        template=CHART_TEMPLATE,
+    )
+    top_labels = exposure.nlargest(8, "exposure_index")
+    for _, row in top_labels.iterrows():
+        fig_exposure.add_annotation(
+            x=row["hunger_metric"] if "hunger_metric" in row else row["ghi_2025"],
+            y=row["food_import_pct"],
+            text=row["country_ghi"],
+            showarrow=False,
+            xshift=8,
+            yshift=4,
+            font={"size": 10},
+        )
+    apply_chart_style(fig_exposure, height=560)
+    st.plotly_chart(fig_exposure, width="stretch")
+
+    st.subheader("4. The Action: Scenario Priority List")
+    shock_pct = st.slider("Presentation shock scenario", min_value=0, max_value=60, value=20, step=5, format="+%d%%")
+    pass_through_pct = st.slider("Presentation pass-through assumption", 0, 100, 25, step=5, format="%d%%")
+    scenario = exposure.copy()
+    global_pressure = shock_pct * pass_through_pct / 100
+    scenario["implied_import_cost_pressure_pct"] = scenario["food_import_pct"] * global_pressure / 100
+    scenario["scenario_pressure_score"] = scenario["exposure_index"] * scenario["implied_import_cost_pressure_pct"] / 100
+    top = scenario.nlargest(12, "scenario_pressure_score").sort_values("scenario_pressure_score")
+    fig_priority = px.bar(
+        top,
+        x="scenario_pressure_score",
+        y="country_ghi",
+        orientation="h",
+        color="scenario_pressure_score",
+        color_continuous_scale=RISK_SCALE,
+        labels={"country_ghi": "", "scenario_pressure_score": "Scenario pressure score"},
+        title=f"Priority Countries under +{shock_pct}% Producer Shock x {pass_through_pct}% Pass-through",
+        template=CHART_TEMPLATE,
+    )
+    apply_chart_style(fig_priority, height=470)
+    fig_priority.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig_priority, width="stretch")
+
+    with st.expander("Why these visuals were added for Part 2"):
+        st.markdown(
+            """
+            - **FFPI shock context** gives the audience the global problem in one screen.
+            - **Wheat signal** turns AUS/NZ producer prices into a memorable indicator commodity.
+            - **Undernourishment exposure** makes the human-centred design stronger than a generic risk score.
+            - **Scenario priority list** converts the analysis into an action: who should be monitored first.
+            """
+        )
 
 
 def overview(data: dict[str, pd.DataFrame]) -> None:
@@ -730,6 +947,7 @@ def main() -> None:
             "View",
             [
                 "Overview",
+                "Part 2 Pitch Brief",
                 "Price Trends",
                 "Volatility",
                 "Global Context",
@@ -746,6 +964,7 @@ def main() -> None:
 
     pages = {
         "Overview": overview,
+        "Part 2 Pitch Brief": pitch_brief,
         "Price Trends": price_trends,
         "Volatility": volatility,
         "Global Context": global_context,
