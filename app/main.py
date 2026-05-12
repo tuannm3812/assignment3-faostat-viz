@@ -36,12 +36,16 @@ CRISIS_PERIODS = [
 ]
 
 COLORS = {
-    "AUS": "#2f6f9f",
-    "NZL": "#b8552f",
-    "FFPI": "#4d4d4d",
-    "risk": "#b2182b",
-    "crisis": "#b2182b",
-    "neutral": "#777777",
+    "AUS": "#8c2981",
+    "NZL": "#de4968",
+    "FFPI": "#3b0f70",
+    "risk": "#f66e5b",
+    "crisis": "#de4968",
+    "neutral": "#6b7280",
+    "low": "#221150",
+    "mid": "#b73779",
+    "high": "#fe9f6d",
+    "highlight": "#fcfdbf",
 }
 
 CHART_TEMPLATE = "plotly_white"
@@ -52,30 +56,35 @@ COUNTRY_COLORS = {
     "New Zealand": COLORS["NZL"],
 }
 FFPI_COLORS = {
-    "ffpi_food": "#4d4d4d",
-    "ffpi_cereals": "#7b8f55",
-    "ffpi_meat": "#b8552f",
-    "ffpi_dairy": "#6f7f94",
-    "ffpi_oils": "#8b6f8f",
-    "ffpi_sugar": "#a75d4f",
+    "ffpi_food": "#3b0f70",
+    "ffpi_cereals": "#8c2981",
+    "ffpi_meat": "#de4968",
+    "ffpi_dairy": "#f66e5b",
+    "ffpi_oils": "#fe9f6d",
+    "ffpi_sugar": "#fcfdbf",
 }
 RISK_SCALE = [
-    [0.00, "#edf3f1"],
-    [0.35, "#a8c5b5"],
-    [0.70, "#c9955c"],
-    [1.00, "#b2182b"],
+    [0.00, "#000004"],
+    [0.25, "#3b0f70"],
+    [0.50, "#8c2981"],
+    [0.75, "#de4968"],
+    [1.00, "#fcfdbf"],
 ]
 
 EXPOSURE_WEIGHTS = {
     "ghi": 0.6,
     "import_dependency": 0.4,
 }
+SCENARIO_ASSUMPTIONS = {
+    "basket_share": 0.45,
+    "transmission_coeff": 0.429,
+    "pass_through_rate": 0.50,
+}
 
 
 def apply_chart_style(fig: go.Figure, height: int | None = None, show_legend: bool | None = None) -> go.Figure:
     layout = {
         "template": CHART_TEMPLATE,
-        "font": {"family": "Source Sans Pro, Arial, sans-serif"},
         "paper_bgcolor": "rgba(0,0,0,0)",
         "plot_bgcolor": "rgba(0,0,0,0)",
         "margin": {"l": 30, "r": 30, "t": 70, "b": 40},
@@ -89,6 +98,13 @@ def apply_chart_style(fig: go.Figure, height: int | None = None, show_legend: bo
     fig.update_xaxes(gridcolor="rgba(127,127,127,0.22)", zerolinecolor="rgba(127,127,127,0.25)")
     fig.update_yaxes(gridcolor="rgba(127,127,127,0.22)", zerolinecolor="rgba(127,127,127,0.25)")
     return fig
+
+
+def story_insight(step: str, insight: str, action: str | None = None) -> None:
+    text = f"**{step}.** {insight}"
+    if action:
+        text += f"\n\n**So what:** {action}"
+    st.info(text)
 
 
 def data_path(filename: str) -> Path:
@@ -459,6 +475,11 @@ def overview(data: dict[str, pd.DataFrame]) -> None:
         "Follow the story from supply-side producer prices, to global food price context, "
         "to countries least able to absorb price pressure."
     )
+    story_insight(
+        "Start with the map of evidence",
+        "The dashboard joins producer prices, FFPI, hunger, and food-import dependency so the audience can move from prices to people.",
+        "Use this page to establish scope before diving into the causal caveats.",
+    )
 
     year_min = int(master["year"].min())
     year_max = int(master["year"].max())
@@ -468,39 +489,53 @@ def overview(data: dict[str, pd.DataFrame]) -> None:
     c1.metric("Coverage", f"{year_min}-{year_max}")
     c2.metric("Commodities", f"{master['item'].nunique():,}")
     c3.metric("Producer price rows", f"{len(master):,}")
-    c4.metric("Latest FFPI food", f"{latest_ffpi['ffpi_food']:.1f}", f"{int(latest_ffpi['year'])}")
+    c4.metric(f"Latest FFPI food ({int(latest_ffpi['year'])})", f"{latest_ffpi['ffpi_food']:.1f}")
 
     country_summary = (
         master.groupby(["iso3", "country"], as_index=False)
         .agg(avg_usd_per_tonne=("value", "mean"), commodities=("item", "nunique"), outliers=("is_outlier", "sum"))
         .sort_values("iso3")
     )
-    fig = px.bar(
-        country_summary,
-        x="country",
-        y="avg_usd_per_tonne",
-        color="iso3",
-        text="commodities",
-        color_discrete_map=COUNTRY_COLORS,
-        labels={"avg_usd_per_tonne": "Average producer price (USD/tonne)", "country": ""},
-        title="Average Producer Price by Country",
-        template=CHART_TEMPLATE,
-    )
-    fig.update_traces(
-        marker_line_color="rgba(255,255,255,0.24)",
-        marker_line_width=1,
-        textfont_color=COLORS["neutral"],
-        texttemplate="%{text} commodities",
-        textposition="outside",
-    )
-    apply_chart_style(fig, height=420, show_legend=False)
-    st.plotly_chart(fig, width="stretch")
+    country_summary["outlier_pct"] = country_summary["outliers"] / country_summary["commodities"].clip(lower=1) * 100
+    country_summary["avg_usd_per_tonne"] = country_summary["avg_usd_per_tonne"].round(0)
 
-    st.subheader("Highest Hunger-Import Exposure")
-    st.dataframe(
-        vuln.head(10)[["country_ghi", "ghi_2025", "food_import_pct", "exposure_index"]].round(2),
-        use_container_width=True,
-        hide_index=True,
+    left, right = st.columns([0.42, 0.58])
+    with left:
+        st.subheader("Country Coverage Snapshot")
+        st.dataframe(
+            country_summary[
+                ["country", "commodities", "avg_usd_per_tonne", "outliers"]
+            ].rename(
+                columns={
+                    "country": "Country",
+                    "commodities": "Commodities",
+                    "avg_usd_per_tonne": "Avg USD/tonne",
+                    "outliers": "Flagged outliers",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+        st.caption("Compact overview only. The detailed price story starts in `Price Trends` and `Volatility`.")
+
+    with right:
+        st.subheader("Highest Hunger-Import Exposure")
+        st.dataframe(
+            vuln.head(8)[["country_ghi", "ghi_2025", "food_import_pct", "exposure_index"]]
+            .round(2)
+            .rename(
+                columns={
+                    "country_ghi": "Country",
+                    "ghi_2025": "GHI 2025",
+                    "food_import_pct": "Food imports %",
+                    "exposure_index": "Exposure index",
+                }
+            ),
+            use_container_width=True,
+            hide_index=True,
+        )
+    st.caption(
+        "This summary establishes dataset scope and priority exposure signals before the detailed analytical views."
     )
 
 
@@ -510,6 +545,11 @@ def price_trends(data: dict[str, pd.DataFrame]) -> None:
 
     st.title("Producer Price Trends")
     st.caption("Start with the supply-side signal: how AUS/NZ commodity prices move through time.")
+    story_insight(
+        "What is changing?",
+        "Producer prices show the supply-side signal, while the FFPI overlay shows whether the selected commodity moves with global food-price pressure.",
+        "Start with Wheat for the clearest presentation example, then test other commodities interactively.",
+    )
     items = sorted(master["item"].dropna().unique())
     default_item = "Wheat" if "Wheat" in items else items[0]
     selected_item = st.selectbox("Commodity", items, index=items.index(default_item))
@@ -577,6 +617,11 @@ def volatility(data: dict[str, pd.DataFrame]) -> None:
     master = data["master_usd"]
     st.title("Commodity Volatility")
     st.caption("Volatility highlights which commodities have unstable producer prices and may deserve closer monitoring.")
+    story_insight(
+        "Which commodities deserve attention?",
+        "Average price alone is not enough; coefficient of variation highlights commodities with unstable producer prices after normalising for scale.",
+        "Use high-volatility commodities as candidates for early-warning monitoring.",
+    )
 
     country = st.radio("Country", ["Australia", "New Zealand"], horizontal=True)
     top_n = st.slider("Number of commodities", min_value=5, max_value=30, value=15, step=5)
@@ -613,6 +658,11 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
 
     st.title("Global Shock and Hunger Context")
     st.caption("Connect local producer-price movement to global food price shock periods and hunger severity.")
+    story_insight(
+        "So what is the global context?",
+        "FFPI sub-indices reveal the shock environment, while GHI shows why equal price pressure can create unequal human consequences.",
+        "Use this tab to connect the producer-price signal to global food-security risk.",
+    )
     ffpi_cols = ["ffpi_food", "ffpi_cereals", "ffpi_meat", "ffpi_dairy", "ffpi_oils", "ffpi_sugar"]
     selected = st.multiselect(
         "FFPI indices",
@@ -673,7 +723,7 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
         template=CHART_TEMPLATE,
     )
     fig_monthly.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
-    fig_monthly.update_traces(line_color=COLORS["FFPI"], fillcolor="rgba(178, 24, 43, 0.16)")
+    fig_monthly.update_traces(line_color=COLORS["FFPI"], fillcolor="rgba(222, 73, 104, 0.16)")
     apply_chart_style(fig_monthly, height=420)
     st.plotly_chart(fig_monthly, width="stretch")
 
@@ -689,41 +739,42 @@ def global_context(data: dict[str, pd.DataFrame]) -> None:
         template=CHART_TEMPLATE,
     )
     apply_chart_style(fig_map, height=520)
-    fig_map.update_layout(geo_showframe=False, geo_showcoastlines=True, geo_coastlinecolor="#b8c3c9")
+    fig_map.update_layout(geo_showframe=False, geo_showcoastlines=True, geo_coastlinecolor=COLORS["neutral"])
     st.plotly_chart(fig_map, width="stretch")
 
 
 def vulnerability(data: dict[str, pd.DataFrame]) -> None:
     vuln = build_vulnerability(data["ghi"], data["worldbank"])
     st.title("Hunger-Import Exposure Matrix")
+    story_insight(
+        "Who is least able to absorb the shock?",
+        "Countries become priority cases when hunger severity and food-import dependency combine; the sliders then translate that baseline exposure into a scenario ranking.",
+        "This is a prioritisation tool, not a bilateral trade-flow forecast.",
+    )
 
     shock_pct = st.slider("Producer price shock", min_value=0, max_value=60, value=20, step=5, format="+%d%%")
-    pass_through_pct = st.slider(
-        "Producer-to-import price pass-through",
-        min_value=0,
-        max_value=100,
-        value=25,
-        step=5,
-        format="%d%%",
-        help="Illustrative assumption: only part of a producer-price shock reaches import prices.",
-    )
+    basket_share = SCENARIO_ASSUMPTIONS["basket_share"]
+    transmission_coeff = SCENARIO_ASSUMPTIONS["transmission_coeff"]
+    pass_through_rate = SCENARIO_ASSUMPTIONS["pass_through_rate"]
     vuln = vuln.copy()
-    global_price_pressure_pct = shock_pct * pass_through_pct / 100
-    vuln["implied_import_cost_pressure_pct"] = vuln["food_import_pct"] * global_price_pressure_pct / 100
+    effective_global_pressure_pct = shock_pct * basket_share * transmission_coeff * pass_through_rate
+    vuln["implied_import_cost_pressure_pct"] = vuln["food_import_pct"] * effective_global_pressure_pct / 100
     vuln["scenario_pressure_score"] = vuln["exposure_index"] * vuln["implied_import_cost_pressure_pct"] / 100
 
     highest = vuln.iloc[0]
-    c1, c2, c3, c4 = st.columns(4)
-    c1.metric("Highest exposure", highest["country_ghi"], f"{highest['exposure_index']:.1f}/100")
-    c2.metric("Producer shock", f"+{shock_pct}%")
-    c3.metric("Pass-through", f"{pass_through_pct}%")
-    c4.metric("Global pressure assumption", f"{global_price_pressure_pct:.1f}%")
+    c1, c2, c3, c4, c5 = st.columns(5)
+    c1.metric("Highest exposure country", highest["country_ghi"])
+    c2.metric("Exposure index", f"{highest['exposure_index']:.1f}/100")
+    c3.metric("Producer shock", f"+{shock_pct}%")
+    c4.metric("Fixed pass-through", f"{pass_through_rate:.0%}")
+    c5.metric("Effective global pressure", f"{effective_global_pressure_pct:.2f}%")
 
     st.caption(
         "This is an exposure index, not a bilateral AUS/NZ trade-flow model. "
         "Dots stay in the same x/y position because GHI and food import dependency are baseline indicators; "
-        "the sliders change the illustrative scenario pressure shown by bubble size, colour, and bar length. "
-        "The country order may stay similar because the shock is applied as a shared global multiplier."
+        "the shock slider changes the illustrative scenario pressure shown by bubble size, colour, and bar length. "
+        "The scenario uses the team draft assumptions: basket share 45%, transmission coefficient 0.429, "
+        "and pass-through 50%."
     )
 
     with st.expander("Methodology and caveats", expanded=False):
@@ -735,9 +786,15 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
 
             **Scenario pressure**
 
-            `global_price_pressure = producer_price_shock x pass_through_rate`
+            `effective_global_pressure = producer_price_shock x basket_share x transmission_coeff x pass_through_rate`
 
             `scenario_pressure_score = exposure_index x implied_import_cost_pressure / 100`
+
+            **Current assumptions**
+
+            - `basket_share = 0.45`
+            - `transmission_coeff = 0.429`
+            - `pass_through_rate = 0.50`
 
             This is not a bilateral AUS/NZ trade-flow model. It does not estimate exchange-rate effects,
             freight costs, tariffs, subsidies, or supplier substitution. It is a prioritisation tool for
@@ -747,7 +804,7 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
 
     x_med = vuln["ghi_2025"].median()
     y_med = vuln["food_import_pct"].median()
-    max_possible_global_pressure_pct = 60
+    max_possible_global_pressure_pct = 60 * basket_share * transmission_coeff * 1.0
     max_scenario_pressure = max(data["worldbank"]["food_import_pct"].max() * max_possible_global_pressure_pct / 100, 1)
     vuln["scenario_bubble_size"] = vuln["scenario_pressure_score"].clip(lower=0.02)
     max_scenario_score = max(
@@ -782,7 +839,7 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
         },
         title=(
             "Hunger Severity x Food Import Dependency "
-            f"under +{shock_pct}% Producer Shock and {pass_through_pct}% Pass-through"
+            f"under +{shock_pct}% Producer Shock and {effective_global_pressure_pct:.2f}% Effective Global Pressure"
         ),
         template=CHART_TEMPLATE,
     )
@@ -814,7 +871,7 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
         },
         title=(
             "Illustrative What-if Ranking: "
-            f"+{shock_pct}% Producer Shock x {pass_through_pct}% Pass-through"
+            f"+{shock_pct}% Producer Shock x Basket/Transmission/Pass-through Assumptions"
         ),
         template=CHART_TEMPLATE,
     )
@@ -855,6 +912,11 @@ def vulnerability(data: dict[str, pd.DataFrame]) -> None:
 
 def data_explorer(data: dict[str, pd.DataFrame]) -> None:
     st.title("Data Explorer")
+    story_insight(
+        "Can the audience inspect the evidence?",
+        "This tab exposes the cleaned source tables so the dashboard remains transparent and auditable.",
+        "Use it during Q&A if someone asks where a number or variable came from.",
+    )
     label_to_key = {
         "Producer prices, USD": "master_usd",
         "Producer price index": "master_idx",
@@ -876,6 +938,11 @@ def load_live_faostat_pp(params: tuple[tuple[str, str], ...], access_token: str 
 
 def live_faostat(data: dict[str, pd.DataFrame]) -> None:
     st.title("Live FAOSTAT Preview")
+    story_insight(
+        "How can this become a live monitoring workflow?",
+        "The local dashboard uses cleaned files for speed, but this page demonstrates how FAOSTAT can be queried directly for fresh producer-price records.",
+        "Use it as the technical innovation proof point, not as the main pitch path.",
+    )
     st.caption(
         "This page calls the FAOSTAT Producer Prices API directly. "
         "The main dashboard still uses cleaned local files in data/processed."
@@ -947,13 +1014,13 @@ def main() -> None:
             "View",
             [
                 "Overview",
-                "Part 2 Pitch Brief",
                 "Price Trends",
                 "Volatility",
                 "Global Context",
                 "Exposure Matrix",
-                "Live FAOSTAT",
                 "Data Explorer",
+                "Live FAOSTAT",
+                "Part 2 Pitch Brief",
             ],
         )
         st.divider()
@@ -964,13 +1031,13 @@ def main() -> None:
 
     pages = {
         "Overview": overview,
-        "Part 2 Pitch Brief": pitch_brief,
         "Price Trends": price_trends,
         "Volatility": volatility,
         "Global Context": global_context,
         "Exposure Matrix": vulnerability,
-        "Live FAOSTAT": live_faostat,
         "Data Explorer": data_explorer,
+        "Live FAOSTAT": live_faostat,
+        "Part 2 Pitch Brief": pitch_brief,
     }
     pages[page](data)
 
