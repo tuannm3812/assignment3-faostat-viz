@@ -642,33 +642,7 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     fig.update_yaxes(categoryorder="total ascending")
     st.plotly_chart(fig, width="stretch")
 
-    st.subheader("Method and Sensitivity")
-    fig_scatter = px.scatter(
-        scenario,
-        x="vulnerability_score",
-        y="implied_import_cost_pressure_pct",
-        color="implied_import_cost_pressure_pct",
-        size="implied_import_cost_pressure_pct",
-        size_max=24,
-        hover_name="country_ghi",
-        color_continuous_scale=RISK_SCALE,
-        range_color=[0, max_import_pressure],
-        labels={
-            "vulnerability_score": "Vulnerability score",
-            "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)",
-        },
-        title="Vulnerability x Implied Import-Cost Pressure",
-        template=CHART_TEMPLATE,
-    )
-    apply_chart_style(fig_scatter, height=420)
-    x_min = exposure["vulnerability_score"].min()
-    x_max = exposure["vulnerability_score"].max()
-    x_pad = max((x_max - x_min) * 0.08, 0.2)
-    fig_scatter.update_xaxes(range=[x_min - x_pad, x_max + x_pad])
-    fig_scatter.update_yaxes(range=[0, max_import_pressure * 1.08])
-    st.plotly_chart(fig_scatter, width="stretch")
-
-    with st.expander("Scenario assumptions and honest boundaries", expanded=True):
+    with st.expander("Scenario assumptions and boundaries", expanded=False):
         st.markdown(
             f"""
             **Formula**

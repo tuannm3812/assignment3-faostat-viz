@@ -91,7 +91,8 @@ assignment3-faostat-viz/
 |   |-- 01_data_preparation/
 |   |   `-- 01_data_cleaning_pipeline.ipynb
 |   `-- 02_exploratory_analysis/
-|       `-- 02_exploratory_analysis.ipynb
+|       |-- 04_part2_visual_story_analysis.ipynb
+|       `-- archive/                    # Earlier exploratory notebooks
 |-- src/
 |   `-- data_pipeline/
 |       |-- faostat_client.py           # FAOSTAT API helper
@@ -215,18 +216,16 @@ https://faostatservices.fao.org/api/v1/en/data/PP?area=5501%3E&element=5530%2C55
 Both notebooks resolve the repository root automatically, so they can be run from Jupyter after cloning without copying files into the notebook folders.
 
 - `notebooks/01_data_preparation/01_data_cleaning_pipeline.ipynb` reads from `data/raw/` and writes to `data/processed/`.
-- `notebooks/02_exploratory_analysis/02_exploratory_analysis.ipynb` reads from `data/processed/`.
+- `notebooks/02_exploratory_analysis/04_part2_visual_story_analysis.ipynb` reads from `data/processed/` and contains the current Part 2 visual story analysis.
 - `app/main.py` also reads from `data/processed/`.
 
 ## Dashboard Views
 
-- `Overview`: coverage, commodity count, producer price rows, latest FFPI, and top vulnerability scores.
-- `Price Trends`: selectable commodity time series for Australia/New Zealand with FFPI overlay and crisis-year bands.
-- `Volatility`: highest coefficient-of-variation commodities by country.
-- `Global Context`: FFPI annual and monthly shock timelines plus GHI choropleth.
-- `Exposure Matrix`: hunger-import exposure matrix and what-if shock scenario with producer-to-import pass-through.
-- `Live FAOSTAT`: realtime Producer Prices API preview using a pasted session token or local `FAOSTAT_ACCESS_TOKEN`.
-- `Data Explorer`: inspect the local CSV tables.
+- `Context`: scope, data-health checkpoint, and narrative framing.
+- `Producer Signal`: Australia/New Zealand producer-price evidence and volatility.
+- `Vulnerability`: hunger and food-import exposure using the shared `vulnerability_score`.
+- `What-If Action`: parameterized shock scenario and priority-country ranking.
+- `Appendix`: data dictionary, assumptions, limitations, and transparent source tables.
 
 ## Assessment Documents
 
