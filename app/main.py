@@ -306,12 +306,11 @@ def build_corrected_vulnerability(ghi: pd.DataFrame, worldbank: pd.DataFrame) ->
     exposure["food_import_pct"] = exposure["food_import_pct"].fillna(exposure["food_import_pct"].median())
     exposure["z_undernourishment"] = zscore(exposure["undernourishment_2024"])
     exposure["z_food_import"] = zscore(exposure["food_import_pct"])
-    exposure["vulnerability_score_v2"] = (
+    exposure["vulnerability_score"] = (
         EXPOSURE_WEIGHTS["ghi"] * exposure["z_undernourishment"]
         + EXPOSURE_WEIGHTS["import_dependency"] * exposure["z_food_import"]
     )
-    exposure["vulnerability_display_score"] = minmax_scale(exposure["vulnerability_score_v2"]) * 100
-    return exposure.sort_values("vulnerability_score_v2", ascending=False)
+    return exposure.sort_values("vulnerability_score", ascending=False)
 
 
 def build_ffpi_correlation(master_idx: pd.DataFrame, ffpi_annual: pd.DataFrame) -> pd.DataFrame:
@@ -356,11 +355,6 @@ def build_scenario(exposure: pd.DataFrame, shock_pct: int | float) -> tuple[pd.D
     )
     scenario["implied_import_cost_pressure_pct"] = (
         scenario["food_import_pct"] * effective_global_pressure_pct / 100
-    )
-    scenario["scenario_pressure_score"] = (
-        scenario["vulnerability_display_score"] * scenario["implied_import_cost_pressure_pct"] / 100
-        if "vulnerability_display_score" in scenario
-        else scenario["exposure_index"] * scenario["implied_import_cost_pressure_pct"] / 100
     )
     return scenario.sort_values("implied_import_cost_pressure_pct", ascending=False), effective_global_pressure_pct
 
@@ -524,27 +518,28 @@ def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
         exposure,
         x="hunger_metric" if "hunger_metric" in exposure else "ghi_2025",
         y="food_import_pct",
-        color="vulnerability_display_score",
-        size="vulnerability_display_score",
-        size_max=28,
+        color="vulnerability_score",
         hover_name="country_ghi",
         hover_data={
             "food_import_pct": ":.1f",
-            "vulnerability_score_v2": ":.2f",
-            "vulnerability_display_score": ":.1f",
+            "vulnerability_score": ":.2f",
             "ghi_2025": ":.1f",
         },
         color_continuous_scale=RISK_SCALE,
+        range_color=[
+            exposure["vulnerability_score"].min(),
+            exposure["vulnerability_score"].max(),
+        ],
         labels={
             "hunger_metric": x_label,
             "food_import_pct": "Food imports (% of merchandise imports)",
-            "vulnerability_display_score": "Vulnerability score",
-            "vulnerability_score_v2": "Z-score vulnerability",
+            "vulnerability_score": "Vulnerability score",
         },
         title="Hunger/Food-Access Stress x Food Import Dependency",
         template=CHART_TEMPLATE,
     )
-    for _, row in exposure.nlargest(8, "vulnerability_score_v2").iterrows():
+    fig.update_traces(marker={"size": 12, "opacity": 0.82, "line": {"color": "rgba(255,255,255,0.45)", "width": 0.7}})
+    for _, row in exposure.nlargest(8, "vulnerability_score").iterrows():
         fig.add_annotation(
             x=row["hunger_metric"] if "hunger_metric" in row else row["ghi_2025"],
             y=row["food_import_pct"],
@@ -623,7 +618,6 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     top = scenario.nlargest(12, "implied_import_cost_pressure_pct")
     max_scenario, _ = build_scenario(exposure, 60)
     max_import_pressure = max(max_scenario["implied_import_cost_pressure_pct"].max(), 0.01)
-    max_pressure_score = max(max_scenario["scenario_pressure_score"].max(), 0.01)
     fig = px.bar(
         top,
         x="implied_import_cost_pressure_pct",
@@ -635,7 +629,7 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
         hover_data={
             "hunger_metric": ":.1f",
             "food_import_pct": ":.1f",
-            "vulnerability_score_v2": ":.2f",
+            "vulnerability_score": ":.2f",
             "implied_import_cost_pressure_pct": ":.2f",
         },
         labels={"country_ghi": "", "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)"},
@@ -651,24 +645,26 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     st.subheader("Method and Sensitivity")
     fig_scatter = px.scatter(
         scenario,
-        x="vulnerability_display_score",
+        x="vulnerability_score",
         y="implied_import_cost_pressure_pct",
-        color="scenario_pressure_score",
-        size="scenario_pressure_score",
+        color="implied_import_cost_pressure_pct",
+        size="implied_import_cost_pressure_pct",
         size_max=24,
         hover_name="country_ghi",
         color_continuous_scale=RISK_SCALE,
-        range_color=[0, max_pressure_score],
+        range_color=[0, max_import_pressure],
         labels={
-            "vulnerability_display_score": "Vulnerability score",
+            "vulnerability_score": "Vulnerability score",
             "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)",
-            "scenario_pressure_score": "Scenario pressure score",
         },
         title="Vulnerability x Implied Import-Cost Pressure",
         template=CHART_TEMPLATE,
     )
     apply_chart_style(fig_scatter, height=420)
-    fig_scatter.update_xaxes(range=[0, 105])
+    x_min = exposure["vulnerability_score"].min()
+    x_max = exposure["vulnerability_score"].max()
+    x_pad = max((x_max - x_min) * 0.08, 0.2)
+    fig_scatter.update_xaxes(range=[x_min - x_pad, x_max + x_pad])
     fig_scatter.update_yaxes(range=[0, max_import_pressure * 1.08])
     st.plotly_chart(fig_scatter, width="stretch")
 
