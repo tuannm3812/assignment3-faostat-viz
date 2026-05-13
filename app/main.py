@@ -511,7 +511,7 @@ def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
     worldbank = data["worldbank"]
 
     st.title("Who Is Most Vulnerable?")
-    st.caption("The corrected vulnerability score combines undernourishment and food-import dependency using the same z-score method as the refined analysis notebook.")
+    st.caption("The corrected vulnerability score combines undernourishment and food-import dependency using a transparent z-score weighted method.")
     story_insight(
         "Hunger severity needs an exposure channel",
         "Countries become priority cases when food-access stress and import dependency combine.",
@@ -601,7 +601,9 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     exposure = build_corrected_vulnerability(data["ghi"], data["worldbank"])
 
     st.title("What-If Scenario and Priority Ranking")
-    st.caption("The scenario follows the refined notebook: effective global pressure is applied to food-import dependency to identify countries with the largest implied import-cost pressure.")
+    st.caption(
+        "Estimate how an AUS/NZ producer-price shock could translate into import-cost pressure for structurally exposed countries."
+    )
     story_insight(
         "The scenario converts insight into action",
         "The ranking shows where early-warning monitoring should focus under an illustrative AUS/NZ producer-price shock.",
@@ -619,6 +621,10 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
 
     st.subheader("Scenario Priority Ranking")
     top = scenario.nlargest(12, "implied_import_cost_pressure_pct").sort_values("implied_import_cost_pressure_pct")
+    max_scenario, _ = build_scenario(exposure, 60)
+    max_import_pressure = max(max_scenario["implied_import_cost_pressure_pct"].max(), 0.01)
+    max_pressure_score = max(max_scenario["scenario_pressure_score"].max(), 0.01)
+    country_order = top["country_ghi"].tolist()
     fig = px.bar(
         top,
         x="implied_import_cost_pressure_pct",
@@ -626,18 +632,21 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
         orientation="h",
         color="implied_import_cost_pressure_pct",
         color_continuous_scale=RISK_SCALE,
+        range_color=[0, max_import_pressure],
         hover_data={
             "hunger_metric": ":.1f",
             "food_import_pct": ":.1f",
             "vulnerability_score_v2": ":.2f",
             "implied_import_cost_pressure_pct": ":.2f",
         },
+        category_orders={"country_ghi": country_order},
         labels={"country_ghi": "", "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)"},
         title=f"Priority Countries under +{shock_pct}% Producer Shock",
         template=CHART_TEMPLATE,
     )
     apply_chart_style(fig, height=560)
     fig.update_layout(coloraxis_showscale=False)
+    fig.update_xaxes(range=[0, max_import_pressure * 1.08])
     st.plotly_chart(fig, width="stretch")
 
     st.subheader("Method and Sensitivity")
@@ -650,6 +659,7 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
         size_max=24,
         hover_name="country_ghi",
         color_continuous_scale=RISK_SCALE,
+        range_color=[0, max_pressure_score],
         labels={
             "vulnerability_display_score": "Vulnerability score",
             "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)",
@@ -659,6 +669,8 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
         template=CHART_TEMPLATE,
     )
     apply_chart_style(fig_scatter, height=420)
+    fig_scatter.update_xaxes(range=[0, 105])
+    fig_scatter.update_yaxes(range=[0, max_import_pressure * 1.08])
     st.plotly_chart(fig_scatter, width="stretch")
 
     with st.expander("Scenario assumptions and honest boundaries", expanded=True):
