@@ -292,6 +292,28 @@ def build_undernourishment_exposure(ghi: pd.DataFrame, worldbank: pd.DataFrame) 
     return exposure.sort_values("exposure_index", ascending=False)
 
 
+def zscore(series: pd.Series) -> pd.Series:
+    std = series.std()
+    if pd.isna(std) or std == 0:
+        return pd.Series(0.0, index=series.index)
+    return (series - series.mean()) / std
+
+
+def build_corrected_vulnerability(ghi: pd.DataFrame, worldbank: pd.DataFrame) -> pd.DataFrame:
+    exposure = build_undernourishment_exposure(ghi, worldbank).copy()
+    hunger = exposure["undernourishment_2024"] if "undernourishment_2024" in exposure else exposure["hunger_metric"]
+    exposure["undernourishment_2024"] = hunger.fillna(hunger.median())
+    exposure["food_import_pct"] = exposure["food_import_pct"].fillna(exposure["food_import_pct"].median())
+    exposure["z_undernourishment"] = zscore(exposure["undernourishment_2024"])
+    exposure["z_food_import"] = zscore(exposure["food_import_pct"])
+    exposure["vulnerability_score_v2"] = (
+        EXPOSURE_WEIGHTS["ghi"] * exposure["z_undernourishment"]
+        + EXPOSURE_WEIGHTS["import_dependency"] * exposure["z_food_import"]
+    )
+    exposure["vulnerability_display_score"] = minmax_scale(exposure["vulnerability_score_v2"]) * 100
+    return exposure.sort_values("vulnerability_score_v2", ascending=False)
+
+
 def build_ffpi_correlation(master_idx: pd.DataFrame, ffpi_annual: pd.DataFrame) -> pd.DataFrame:
     price_idx = (
         master_idx.groupby(["iso3", "country", "year"], as_index=False)["value"]
@@ -336,24 +358,26 @@ def build_scenario(exposure: pd.DataFrame, shock_pct: int | float) -> tuple[pd.D
         scenario["food_import_pct"] * effective_global_pressure_pct / 100
     )
     scenario["scenario_pressure_score"] = (
-        scenario["exposure_index"] * scenario["implied_import_cost_pressure_pct"] / 100
+        scenario["vulnerability_display_score"] * scenario["implied_import_cost_pressure_pct"] / 100
+        if "vulnerability_display_score" in scenario
+        else scenario["exposure_index"] * scenario["implied_import_cost_pressure_pct"] / 100
     )
-    return scenario.sort_values("scenario_pressure_score", ascending=False), effective_global_pressure_pct
+    return scenario.sort_values("implied_import_cost_pressure_pct", ascending=False), effective_global_pressure_pct
 
 
 def slide_context(data: dict[str, pd.DataFrame]) -> None:
     ffpi = data["ffpi_annual"]
     ffpi_m = data["ffpi_monthly"]
 
-    st.title("Slide 2 - Why Food Price Shocks Matter")
-    st.caption("Main visual first: global FFPI shock context. Backup plots sit below for Q&A.")
+    st.title("Why Food Price Shocks Matter")
+    st.caption("Global food-price pressure has surged repeatedly; the question is who has the least capacity to absorb it.")
     story_insight(
         "Food price shocks are global, but vulnerability is not evenly shared",
         "The FFPI shows repeated global stress events across the last three decades.",
         "Use this tab to establish the problem before narrowing to Australia and New Zealand.",
     )
 
-    st.subheader("Main Visual - FAO Food Price Index Shock Timeline")
+    st.subheader("Global Food Price Shock Timeline")
     fig = px.line(
         ffpi[ffpi["year"] >= 1991],
         x="year",
@@ -368,7 +392,7 @@ def slide_context(data: dict[str, pd.DataFrame]) -> None:
     apply_chart_style(fig, height=560)
     st.plotly_chart(fig, width="stretch")
 
-    st.subheader("Backup Plots")
+    st.subheader("Supporting Evidence")
     c1, c2, c3 = st.columns(3)
     crisis_years = [2008, 2011, 2022]
     crisis = ffpi[ffpi["year"].isin(crisis_years)].set_index("year")
@@ -382,7 +406,7 @@ def slide_context(data: dict[str, pd.DataFrame]) -> None:
         x="date",
         y="ffpi_food",
         labels={"date": "Date", "ffpi_food": "FFPI food"},
-        title="Backup: Monthly Food Price Shock Timeline",
+        title="Monthly Food Price Shock Timeline",
         template=CHART_TEMPLATE,
     )
     fig_monthly.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
@@ -397,15 +421,15 @@ def slide_producer_signal(data: dict[str, pd.DataFrame]) -> None:
     ffpi = data["ffpi_annual"]
     wheat = build_wheat_signal(master, ffpi)
 
-    st.title("Slide 4 - Australia and New Zealand Producer Price Signal")
-    st.caption("Main visual first: wheat as the indicator commodity. Backup plots test whether the pattern generalises.")
+    st.title("Australia and New Zealand Producer Price Signal")
+    st.caption("Wheat is used as the indicator commodity because it is globally recognisable and visibly moves through food-price shock periods.")
     story_insight(
         "Wheat makes the global shock visible",
         "Wheat is a globally important staple and a clear way to connect AUS/NZ producer prices to the FFPI story.",
         "Use this tab to show why the project uses producer prices as a supply-side signal.",
     )
 
-    st.subheader("Main Visual - Wheat Producer Prices vs Global FFPI")
+    st.subheader("Wheat Producer Prices vs Global FFPI")
     if wheat.empty:
         st.warning("Wheat is not available in the current producer-price file.")
     else:
@@ -443,7 +467,7 @@ def slide_producer_signal(data: dict[str, pd.DataFrame]) -> None:
         fig.update_yaxes(title_text="FFPI food index", secondary_y=True)
         st.plotly_chart(fig, width="stretch")
 
-    st.subheader("Backup Plots")
+    st.subheader("Supporting Evidence")
     corr = build_ffpi_correlation(master_idx, ffpi)
     fig_corr = px.bar(
         corr.sort_values(["country", "correlation"]),
@@ -454,7 +478,7 @@ def slide_producer_signal(data: dict[str, pd.DataFrame]) -> None:
         orientation="h",
         color_discrete_map=COUNTRY_COLORS,
         labels={"correlation": "Pearson correlation", "ffpi_index": "FFPI sub-index"},
-        title="Backup: AUS/NZ Producer Price Index Alignment with FFPI",
+        title="AUS/NZ Producer Price Index Alignment with FFPI",
         template=CHART_TEMPLATE,
     )
     fig_corr.add_vline(x=0, line_color=COLORS["neutral"])
@@ -463,7 +487,7 @@ def slide_producer_signal(data: dict[str, pd.DataFrame]) -> None:
 
     items = [item for item in ["Barley", "Maize (corn)", "Rice", "Soya beans", "Raw milk of cattle"] if item in master["item"].values]
     if items:
-        selected_item = st.selectbox("Backup commodity check", items)
+        selected_item = st.selectbox("Commodity check", items)
         filtered = master[master["item"].eq(selected_item)].sort_values("year")
         fig_item = px.line(
             filtered,
@@ -473,7 +497,7 @@ def slide_producer_signal(data: dict[str, pd.DataFrame]) -> None:
             markers=True,
             color_discrete_map=COUNTRY_COLORS,
             labels={"value": "USD/tonne", "country": ""},
-            title=f"Backup: {selected_item} Producer Prices",
+            title=f"{selected_item} Producer Prices",
             template=CHART_TEMPLATE,
         )
         add_crisis_bands(fig_item)
@@ -482,39 +506,45 @@ def slide_producer_signal(data: dict[str, pd.DataFrame]) -> None:
 
 
 def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
-    exposure = build_undernourishment_exposure(data["ghi"], data["worldbank"])
+    exposure = build_corrected_vulnerability(data["ghi"], data["worldbank"])
     ghi = data["ghi"]
     worldbank = data["worldbank"]
 
-    st.title("Slide 6 - Who Is Most Vulnerable?")
-    st.caption("Main visual first: corrected vulnerability matrix. Backup plots show the two source dimensions.")
+    st.title("Who Is Most Vulnerable?")
+    st.caption("The corrected vulnerability score combines undernourishment and food-import dependency using the same z-score method as the refined analysis notebook.")
     story_insight(
         "Hunger severity needs an exposure channel",
         "Countries become priority cases when food-access stress and import dependency combine.",
         "Use this tab to explain why raw multiplication was replaced by a normalized weighted exposure score.",
     )
 
-    st.subheader("Main Visual - Corrected Vulnerability Matrix")
+    st.subheader("Corrected Vulnerability Matrix")
     x_label = exposure["hunger_metric_label"].iloc[0] if "hunger_metric_label" in exposure else "GHI score 2025"
     fig = px.scatter(
         exposure,
         x="hunger_metric" if "hunger_metric" in exposure else "ghi_2025",
         y="food_import_pct",
-        color="exposure_index",
-        size="exposure_index",
+        color="vulnerability_display_score",
+        size="vulnerability_display_score",
         size_max=28,
         hover_name="country_ghi",
-        hover_data={"food_import_pct": ":.1f", "exposure_index": ":.1f", "ghi_2025": ":.1f"},
+        hover_data={
+            "food_import_pct": ":.1f",
+            "vulnerability_score_v2": ":.2f",
+            "vulnerability_display_score": ":.1f",
+            "ghi_2025": ":.1f",
+        },
         color_continuous_scale=RISK_SCALE,
         labels={
             "hunger_metric": x_label,
             "food_import_pct": "Food imports (% of merchandise imports)",
-            "exposure_index": "Exposure index",
+            "vulnerability_display_score": "Vulnerability score",
+            "vulnerability_score_v2": "Z-score vulnerability",
         },
         title="Hunger/Food-Access Stress x Food Import Dependency",
         template=CHART_TEMPLATE,
     )
-    for _, row in exposure.nlargest(8, "exposure_index").iterrows():
+    for _, row in exposure.nlargest(8, "vulnerability_score_v2").iterrows():
         fig.add_annotation(
             x=row["hunger_metric"] if "hunger_metric" in row else row["ghi_2025"],
             y=row["food_import_pct"],
@@ -529,7 +559,7 @@ def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
     apply_chart_style(fig, height=610)
     st.plotly_chart(fig, width="stretch")
 
-    st.subheader("Backup Plots")
+    st.subheader("Supporting Evidence")
     col1, col2 = st.columns(2)
     with col1:
         ghi_valid = ghi.dropna(subset=["iso3", "ghi_2025"])
@@ -540,7 +570,7 @@ def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
             hover_name="country_ghi",
             color_continuous_scale=RISK_SCALE,
             labels={"ghi_2025": "GHI 2025"},
-            title="Backup: Global Hunger Index 2025",
+            title="Global Hunger Index 2025",
             template=CHART_TEMPLATE,
         )
         apply_chart_style(fig_map, height=420)
@@ -559,7 +589,7 @@ def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
             nbins=35,
             color_discrete_sequence=[COLORS["AUS"]],
             labels={"food_import_pct": "Food imports (% of merchandise imports)"},
-            title="Backup: Distribution of Food Import Dependency",
+            title="Distribution of Food Import Dependency",
             template=CHART_TEMPLATE,
         )
         fig_hist.add_vline(x=latest_imports["food_import_pct"].median(), line_dash="dash", line_color=COLORS["neutral"])
@@ -568,10 +598,10 @@ def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
 
 
 def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
-    exposure = build_undernourishment_exposure(data["ghi"], data["worldbank"])
+    exposure = build_corrected_vulnerability(data["ghi"], data["worldbank"])
 
-    st.title("Slide 7 - What-If Scenario and Priority Ranking")
-    st.caption("Main visual first: scenario priority list. Backup material explains the assumptions and limitations.")
+    st.title("What-If Scenario and Priority Ranking")
+    st.caption("The scenario follows the refined notebook: effective global pressure is applied to food-import dependency to identify countries with the largest implied import-cost pressure.")
     story_insight(
         "The scenario converts insight into action",
         "The ranking shows where early-warning monitoring should focus under an illustrative AUS/NZ producer-price shock.",
@@ -587,22 +617,22 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     c3.metric("Transmission x pass-through", f"{SCENARIO_ASSUMPTIONS['transmission_coeff']:.3f} x {SCENARIO_ASSUMPTIONS['pass_through_rate']:.0%}")
     c4.metric("Effective global pressure", f"{effective_global_pressure_pct:.2f}%")
 
-    st.subheader("Main Visual - Scenario Priority Ranking")
-    top = scenario.nlargest(12, "scenario_pressure_score").sort_values("scenario_pressure_score")
+    st.subheader("Scenario Priority Ranking")
+    top = scenario.nlargest(12, "implied_import_cost_pressure_pct").sort_values("implied_import_cost_pressure_pct")
     fig = px.bar(
         top,
-        x="scenario_pressure_score",
+        x="implied_import_cost_pressure_pct",
         y="country_ghi",
         orientation="h",
-        color="scenario_pressure_score",
+        color="implied_import_cost_pressure_pct",
         color_continuous_scale=RISK_SCALE,
         hover_data={
             "hunger_metric": ":.1f",
             "food_import_pct": ":.1f",
-            "exposure_index": ":.1f",
+            "vulnerability_score_v2": ":.2f",
             "implied_import_cost_pressure_pct": ":.2f",
         },
-        labels={"country_ghi": "", "scenario_pressure_score": "Scenario pressure score"},
+        labels={"country_ghi": "", "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)"},
         title=f"Priority Countries under +{shock_pct}% Producer Shock",
         template=CHART_TEMPLATE,
     )
@@ -610,10 +640,10 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     fig.update_layout(coloraxis_showscale=False)
     st.plotly_chart(fig, width="stretch")
 
-    st.subheader("Backup Plots and Method")
+    st.subheader("Method and Sensitivity")
     fig_scatter = px.scatter(
         scenario,
-        x="exposure_index",
+        x="vulnerability_display_score",
         y="implied_import_cost_pressure_pct",
         color="scenario_pressure_score",
         size="scenario_pressure_score",
@@ -621,11 +651,11 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
         hover_name="country_ghi",
         color_continuous_scale=RISK_SCALE,
         labels={
-            "exposure_index": "Exposure index",
+            "vulnerability_display_score": "Vulnerability score",
             "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)",
             "scenario_pressure_score": "Scenario pressure score",
         },
-        title="Backup: Exposure x Implied Import-Cost Pressure",
+        title="Vulnerability x Implied Import-Cost Pressure",
         template=CHART_TEMPLATE,
     )
     apply_chart_style(fig_scatter, height=420)
@@ -652,7 +682,7 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
 
 def appendix(data: dict[str, pd.DataFrame]) -> None:
     st.title("Appendix")
-    st.caption("Backup views for Q&A, data inspection, and technical validation.")
+    st.caption("Reference views for Q&A, data inspection, and technical validation.")
 
     st.subheader("Dataset Explorer")
     label_to_key = {
@@ -668,7 +698,7 @@ def appendix(data: dict[str, pd.DataFrame]) -> None:
     st.caption(f"{len(df):,} rows x {df.shape[1]:,} columns")
     st.dataframe(df, use_container_width=True, hide_index=True)
 
-    st.subheader("Backup: Commodity Volatility")
+    st.subheader("Commodity Volatility")
     country = st.radio("Country", ["Australia", "New Zealand"], horizontal=True)
     subset = data["master_usd"][data["master_usd"]["country"] == country]
     vol = subset.groupby("item")["value"].agg(["mean", "std", "count"]).reset_index()
@@ -1306,10 +1336,10 @@ def main() -> None:
         page = st.radio(
             "View",
             [
-                "Slide 2 - Context",
-                "Slide 4 - Producer Signal",
-                "Slide 6 - Vulnerability",
-                "Slide 7 - What-If Action",
+                "Context",
+                "Producer Signal",
+                "Vulnerability",
+                "What-If Action",
                 "Appendix",
             ],
         )
@@ -1320,10 +1350,10 @@ def main() -> None:
         return
 
     pages = {
-        "Slide 2 - Context": slide_context,
-        "Slide 4 - Producer Signal": slide_producer_signal,
-        "Slide 6 - Vulnerability": slide_vulnerability,
-        "Slide 7 - What-If Action": slide_what_if,
+        "Context": slide_context,
+        "Producer Signal": slide_producer_signal,
+        "Vulnerability": slide_vulnerability,
+        "What-If Action": slide_what_if,
         "Appendix": appendix,
     }
     pages[page](data)
