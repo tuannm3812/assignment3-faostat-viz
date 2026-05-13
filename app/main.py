@@ -620,11 +620,10 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     c4.metric("Effective global pressure", f"{effective_global_pressure_pct:.2f}%")
 
     st.subheader("Scenario Priority Ranking")
-    top = scenario.nlargest(12, "implied_import_cost_pressure_pct").sort_values("implied_import_cost_pressure_pct")
+    top = scenario.nlargest(12, "implied_import_cost_pressure_pct")
     max_scenario, _ = build_scenario(exposure, 60)
     max_import_pressure = max(max_scenario["implied_import_cost_pressure_pct"].max(), 0.01)
     max_pressure_score = max(max_scenario["scenario_pressure_score"].max(), 0.01)
-    country_order = top["country_ghi"].tolist()
     fig = px.bar(
         top,
         x="implied_import_cost_pressure_pct",
@@ -639,7 +638,6 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
             "vulnerability_score_v2": ":.2f",
             "implied_import_cost_pressure_pct": ":.2f",
         },
-        category_orders={"country_ghi": country_order},
         labels={"country_ghi": "", "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)"},
         title=f"Priority Countries under +{shock_pct}% Producer Shock",
         template=CHART_TEMPLATE,
@@ -647,6 +645,7 @@ def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
     apply_chart_style(fig, height=560)
     fig.update_layout(coloraxis_showscale=False)
     fig.update_xaxes(range=[0, max_import_pressure * 1.08])
+    fig.update_yaxes(categoryorder="total ascending")
     st.plotly_chart(fig, width="stretch")
 
     st.subheader("Method and Sensitivity")
