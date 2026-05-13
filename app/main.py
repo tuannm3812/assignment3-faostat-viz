@@ -15,8 +15,6 @@ ROOT_DIR = Path(__file__).resolve().parents[1]
 if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
-from src.data_pipeline.faostat_client import FaostatApiError, get_domain_data
-
 PROCESSED_DIR = ROOT_DIR / "data" / "processed"
 LEGACY_RAW_DIR = ROOT_DIR / "data" / "raw"
 
@@ -324,6 +322,374 @@ def build_wheat_signal(master_usd: pd.DataFrame, ffpi_annual: pd.DataFrame) -> p
     if "ffpi_food_annual" in wheat.columns:
         wheat["ffpi_food"] = wheat["ffpi_food_annual"].fillna(wheat["ffpi_food"])
     return wheat.sort_values(["country", "year"])
+
+
+def build_scenario(exposure: pd.DataFrame, shock_pct: int | float) -> tuple[pd.DataFrame, float]:
+    scenario = exposure.copy()
+    effective_global_pressure_pct = (
+        shock_pct
+        * SCENARIO_ASSUMPTIONS["basket_share"]
+        * SCENARIO_ASSUMPTIONS["transmission_coeff"]
+        * SCENARIO_ASSUMPTIONS["pass_through_rate"]
+    )
+    scenario["implied_import_cost_pressure_pct"] = (
+        scenario["food_import_pct"] * effective_global_pressure_pct / 100
+    )
+    scenario["scenario_pressure_score"] = (
+        scenario["exposure_index"] * scenario["implied_import_cost_pressure_pct"] / 100
+    )
+    return scenario.sort_values("scenario_pressure_score", ascending=False), effective_global_pressure_pct
+
+
+def slide_context(data: dict[str, pd.DataFrame]) -> None:
+    ffpi = data["ffpi_annual"]
+    ffpi_m = data["ffpi_monthly"]
+
+    st.title("Slide 2 - Why Food Price Shocks Matter")
+    st.caption("Main visual first: global FFPI shock context. Backup plots sit below for Q&A.")
+    story_insight(
+        "Food price shocks are global, but vulnerability is not evenly shared",
+        "The FFPI shows repeated global stress events across the last three decades.",
+        "Use this tab to establish the problem before narrowing to Australia and New Zealand.",
+    )
+
+    st.subheader("Main Visual - FAO Food Price Index Shock Timeline")
+    fig = px.line(
+        ffpi[ffpi["year"] >= 1991],
+        x="year",
+        y=["ffpi_food", "ffpi_cereals", "ffpi_meat", "ffpi_sugar"],
+        color_discrete_map=FFPI_COLORS,
+        labels={"value": "Index (2014-2016 = 100)", "variable": "Index"},
+        title="When the World's Food Got Expensive",
+        template=CHART_TEMPLATE,
+    )
+    fig.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
+    add_crisis_bands(fig)
+    apply_chart_style(fig, height=560)
+    st.plotly_chart(fig, width="stretch")
+
+    st.subheader("Backup Plots")
+    c1, c2, c3 = st.columns(3)
+    crisis_years = [2008, 2011, 2022]
+    crisis = ffpi[ffpi["year"].isin(crisis_years)].set_index("year")
+    for col, year in zip([c1, c2, c3], crisis_years):
+        if year in crisis.index:
+            col.metric(f"{year} FFPI food", f"{crisis.loc[year, 'ffpi_food']:.1f}")
+
+    monthly = ffpi_m[ffpi_m["year"] >= 2000].copy()
+    fig_monthly = px.area(
+        monthly,
+        x="date",
+        y="ffpi_food",
+        labels={"date": "Date", "ffpi_food": "FFPI food"},
+        title="Backup: Monthly Food Price Shock Timeline",
+        template=CHART_TEMPLATE,
+    )
+    fig_monthly.add_hline(y=100, line_dash="dash", line_color=COLORS["neutral"])
+    fig_monthly.update_traces(line_color=COLORS["FFPI"], fillcolor="rgba(222, 73, 104, 0.16)")
+    apply_chart_style(fig_monthly, height=390)
+    st.plotly_chart(fig_monthly, width="stretch")
+
+
+def slide_producer_signal(data: dict[str, pd.DataFrame]) -> None:
+    master = data["master_usd"]
+    master_idx = data["master_idx"]
+    ffpi = data["ffpi_annual"]
+    wheat = build_wheat_signal(master, ffpi)
+
+    st.title("Slide 4 - Australia and New Zealand Producer Price Signal")
+    st.caption("Main visual first: wheat as the indicator commodity. Backup plots test whether the pattern generalises.")
+    story_insight(
+        "Wheat makes the global shock visible",
+        "Wheat is a globally important staple and a clear way to connect AUS/NZ producer prices to the FFPI story.",
+        "Use this tab to show why the project uses producer prices as a supply-side signal.",
+    )
+
+    st.subheader("Main Visual - Wheat Producer Prices vs Global FFPI")
+    if wheat.empty:
+        st.warning("Wheat is not available in the current producer-price file.")
+    else:
+        fig = make_subplots(specs=[[{"secondary_y": True}]])
+        for country, color in [("Australia", COLORS["AUS"]), ("New Zealand", COLORS["NZL"])]:
+            country_df = wheat[wheat["country"] == country]
+            if country_df.empty:
+                continue
+            fig.add_trace(
+                go.Scatter(
+                    x=country_df["year"],
+                    y=country_df["value"],
+                    mode="lines+markers",
+                    name=f"{country} wheat",
+                    line={"color": color, "width": 3},
+                    hovertemplate="<b>%{fullData.name}</b><br>Year %{x}<br>USD/tonne: $%{y:,.0f}<extra></extra>",
+                ),
+                secondary_y=False,
+            )
+        ffpi_plot = ffpi[["year", "ffpi_food"]].dropna()
+        fig.add_trace(
+            go.Scatter(
+                x=ffpi_plot["year"],
+                y=ffpi_plot["ffpi_food"],
+                mode="lines",
+                name="Global FFPI",
+                line={"color": COLORS["FFPI"], "width": 2, "dash": "dot"},
+            ),
+            secondary_y=True,
+        )
+        add_crisis_bands(fig)
+        apply_chart_style(fig, height=560)
+        fig.update_layout(title="AUS/NZ Wheat Producer Prices vs Global Food Price Index")
+        fig.update_yaxes(title_text="Wheat producer price (USD/tonne)", secondary_y=False)
+        fig.update_yaxes(title_text="FFPI food index", secondary_y=True)
+        st.plotly_chart(fig, width="stretch")
+
+    st.subheader("Backup Plots")
+    corr = build_ffpi_correlation(master_idx, ffpi)
+    fig_corr = px.bar(
+        corr.sort_values(["country", "correlation"]),
+        x="correlation",
+        y="ffpi_index",
+        color="country",
+        barmode="group",
+        orientation="h",
+        color_discrete_map=COUNTRY_COLORS,
+        labels={"correlation": "Pearson correlation", "ffpi_index": "FFPI sub-index"},
+        title="Backup: AUS/NZ Producer Price Index Alignment with FFPI",
+        template=CHART_TEMPLATE,
+    )
+    fig_corr.add_vline(x=0, line_color=COLORS["neutral"])
+    apply_chart_style(fig_corr, height=390)
+    st.plotly_chart(fig_corr, width="stretch")
+
+    items = [item for item in ["Barley", "Maize (corn)", "Rice", "Soya beans", "Raw milk of cattle"] if item in master["item"].values]
+    if items:
+        selected_item = st.selectbox("Backup commodity check", items)
+        filtered = master[master["item"].eq(selected_item)].sort_values("year")
+        fig_item = px.line(
+            filtered,
+            x="year",
+            y="value",
+            color="country",
+            markers=True,
+            color_discrete_map=COUNTRY_COLORS,
+            labels={"value": "USD/tonne", "country": ""},
+            title=f"Backup: {selected_item} Producer Prices",
+            template=CHART_TEMPLATE,
+        )
+        add_crisis_bands(fig_item)
+        apply_chart_style(fig_item, height=390)
+        st.plotly_chart(fig_item, width="stretch")
+
+
+def slide_vulnerability(data: dict[str, pd.DataFrame]) -> None:
+    exposure = build_undernourishment_exposure(data["ghi"], data["worldbank"])
+    ghi = data["ghi"]
+    worldbank = data["worldbank"]
+
+    st.title("Slide 6 - Who Is Most Vulnerable?")
+    st.caption("Main visual first: corrected vulnerability matrix. Backup plots show the two source dimensions.")
+    story_insight(
+        "Hunger severity needs an exposure channel",
+        "Countries become priority cases when food-access stress and import dependency combine.",
+        "Use this tab to explain why raw multiplication was replaced by a normalized weighted exposure score.",
+    )
+
+    st.subheader("Main Visual - Corrected Vulnerability Matrix")
+    x_label = exposure["hunger_metric_label"].iloc[0] if "hunger_metric_label" in exposure else "GHI score 2025"
+    fig = px.scatter(
+        exposure,
+        x="hunger_metric" if "hunger_metric" in exposure else "ghi_2025",
+        y="food_import_pct",
+        color="exposure_index",
+        size="exposure_index",
+        size_max=28,
+        hover_name="country_ghi",
+        hover_data={"food_import_pct": ":.1f", "exposure_index": ":.1f", "ghi_2025": ":.1f"},
+        color_continuous_scale=RISK_SCALE,
+        labels={
+            "hunger_metric": x_label,
+            "food_import_pct": "Food imports (% of merchandise imports)",
+            "exposure_index": "Exposure index",
+        },
+        title="Hunger/Food-Access Stress x Food Import Dependency",
+        template=CHART_TEMPLATE,
+    )
+    for _, row in exposure.nlargest(8, "exposure_index").iterrows():
+        fig.add_annotation(
+            x=row["hunger_metric"] if "hunger_metric" in row else row["ghi_2025"],
+            y=row["food_import_pct"],
+            text=row["country_ghi"],
+            showarrow=False,
+            xshift=8,
+            yshift=4,
+            font={"size": 10},
+        )
+    fig.add_vline(x=exposure["hunger_metric"].median(), line_dash="dash", line_color=COLORS["neutral"])
+    fig.add_hline(y=exposure["food_import_pct"].median(), line_dash="dash", line_color=COLORS["neutral"])
+    apply_chart_style(fig, height=610)
+    st.plotly_chart(fig, width="stretch")
+
+    st.subheader("Backup Plots")
+    col1, col2 = st.columns(2)
+    with col1:
+        ghi_valid = ghi.dropna(subset=["iso3", "ghi_2025"])
+        fig_map = px.choropleth(
+            ghi_valid,
+            locations="iso3",
+            color="ghi_2025",
+            hover_name="country_ghi",
+            color_continuous_scale=RISK_SCALE,
+            labels={"ghi_2025": "GHI 2025"},
+            title="Backup: Global Hunger Index 2025",
+            template=CHART_TEMPLATE,
+        )
+        apply_chart_style(fig_map, height=420)
+        fig_map.update_layout(geo_showframe=False, geo_showcoastlines=True, geo_coastlinecolor=COLORS["neutral"])
+        st.plotly_chart(fig_map, width="stretch")
+    with col2:
+        latest_imports = (
+            worldbank.dropna(subset=["food_import_pct"])
+            .sort_values("year", ascending=False)
+            .groupby("iso3", as_index=False)
+            .first()
+        )
+        fig_hist = px.histogram(
+            latest_imports,
+            x="food_import_pct",
+            nbins=35,
+            color_discrete_sequence=[COLORS["AUS"]],
+            labels={"food_import_pct": "Food imports (% of merchandise imports)"},
+            title="Backup: Distribution of Food Import Dependency",
+            template=CHART_TEMPLATE,
+        )
+        fig_hist.add_vline(x=latest_imports["food_import_pct"].median(), line_dash="dash", line_color=COLORS["neutral"])
+        apply_chart_style(fig_hist, height=420, show_legend=False)
+        st.plotly_chart(fig_hist, width="stretch")
+
+
+def slide_what_if(data: dict[str, pd.DataFrame]) -> None:
+    exposure = build_undernourishment_exposure(data["ghi"], data["worldbank"])
+
+    st.title("Slide 7 - What-If Scenario and Priority Ranking")
+    st.caption("Main visual first: scenario priority list. Backup material explains the assumptions and limitations.")
+    story_insight(
+        "The scenario converts insight into action",
+        "The ranking shows where early-warning monitoring should focus under an illustrative AUS/NZ producer-price shock.",
+        "Use this as an action layer, not an exact import-bill forecast.",
+    )
+
+    shock_pct = st.slider("Producer price shock", min_value=0, max_value=60, value=20, step=5, format="+%d%%")
+    scenario, effective_global_pressure_pct = build_scenario(exposure, shock_pct)
+
+    c1, c2, c3, c4 = st.columns(4)
+    c1.metric("Producer shock", f"+{shock_pct}%")
+    c2.metric("Basket share", f"{SCENARIO_ASSUMPTIONS['basket_share']:.0%}")
+    c3.metric("Transmission x pass-through", f"{SCENARIO_ASSUMPTIONS['transmission_coeff']:.3f} x {SCENARIO_ASSUMPTIONS['pass_through_rate']:.0%}")
+    c4.metric("Effective global pressure", f"{effective_global_pressure_pct:.2f}%")
+
+    st.subheader("Main Visual - Scenario Priority Ranking")
+    top = scenario.nlargest(12, "scenario_pressure_score").sort_values("scenario_pressure_score")
+    fig = px.bar(
+        top,
+        x="scenario_pressure_score",
+        y="country_ghi",
+        orientation="h",
+        color="scenario_pressure_score",
+        color_continuous_scale=RISK_SCALE,
+        hover_data={
+            "hunger_metric": ":.1f",
+            "food_import_pct": ":.1f",
+            "exposure_index": ":.1f",
+            "implied_import_cost_pressure_pct": ":.2f",
+        },
+        labels={"country_ghi": "", "scenario_pressure_score": "Scenario pressure score"},
+        title=f"Priority Countries under +{shock_pct}% Producer Shock",
+        template=CHART_TEMPLATE,
+    )
+    apply_chart_style(fig, height=560)
+    fig.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig, width="stretch")
+
+    st.subheader("Backup Plots and Method")
+    fig_scatter = px.scatter(
+        scenario,
+        x="exposure_index",
+        y="implied_import_cost_pressure_pct",
+        color="scenario_pressure_score",
+        size="scenario_pressure_score",
+        size_max=24,
+        hover_name="country_ghi",
+        color_continuous_scale=RISK_SCALE,
+        labels={
+            "exposure_index": "Exposure index",
+            "implied_import_cost_pressure_pct": "Implied import-cost pressure (%)",
+            "scenario_pressure_score": "Scenario pressure score",
+        },
+        title="Backup: Exposure x Implied Import-Cost Pressure",
+        template=CHART_TEMPLATE,
+    )
+    apply_chart_style(fig_scatter, height=420)
+    st.plotly_chart(fig_scatter, width="stretch")
+
+    with st.expander("Scenario assumptions and honest boundaries", expanded=True):
+        st.markdown(
+            f"""
+            **Formula**
+
+            `effective_global_pressure = producer_shock x basket_share x transmission_coeff x pass_through_rate`
+
+            **Current assumptions**
+
+            - Basket share: `{SCENARIO_ASSUMPTIONS['basket_share']:.2f}`
+            - Transmission coefficient: `{SCENARIO_ASSUMPTIONS['transmission_coeff']:.3f}`
+            - Pass-through rate: `{SCENARIO_ASSUMPTIONS['pass_through_rate']:.2f}`
+
+            This remains an illustrative prioritisation model. It does not include bilateral trade flows,
+            exchange rates, freight costs, tariffs, subsidies, trade margins, or supplier substitution.
+            """
+        )
+
+
+def appendix(data: dict[str, pd.DataFrame]) -> None:
+    st.title("Appendix")
+    st.caption("Backup views for Q&A, data inspection, and technical validation.")
+
+    st.subheader("Dataset Explorer")
+    label_to_key = {
+        "Producer prices, USD": "master_usd",
+        "Producer price index": "master_idx",
+        "FFPI annual": "ffpi_annual",
+        "FFPI monthly": "ffpi_monthly",
+        "Global Hunger Index": "ghi",
+        "World Bank food imports": "worldbank",
+    }
+    label = st.selectbox("Dataset", list(label_to_key))
+    df = data[label_to_key[label]]
+    st.caption(f"{len(df):,} rows x {df.shape[1]:,} columns")
+    st.dataframe(df, use_container_width=True, hide_index=True)
+
+    st.subheader("Backup: Commodity Volatility")
+    country = st.radio("Country", ["Australia", "New Zealand"], horizontal=True)
+    subset = data["master_usd"][data["master_usd"]["country"] == country]
+    vol = subset.groupby("item")["value"].agg(["mean", "std", "count"]).reset_index()
+    vol = vol[vol["count"] >= 5]
+    vol["cv_pct"] = vol["std"] / vol["mean"] * 100
+    vol = vol.sort_values("cv_pct", ascending=False).head(15)
+    fig_vol = px.bar(
+        vol.sort_values("cv_pct"),
+        x="cv_pct",
+        y="item",
+        orientation="h",
+        color="cv_pct",
+        color_continuous_scale=RISK_SCALE,
+        labels={"cv_pct": "Coefficient of variation (%)", "item": ""},
+        title=f"{country}: Most Volatile Producer Prices",
+        template=CHART_TEMPLATE,
+    )
+    fig_vol.add_vline(x=50, line_dash="dash", line_color=COLORS["risk"], annotation_text="50% CV")
+    apply_chart_style(fig_vol, height=520)
+    fig_vol.update_layout(coloraxis_showscale=False)
+    st.plotly_chart(fig_vol, width="stretch")
 
 
 def pitch_brief(data: dict[str, pd.DataFrame]) -> None:
@@ -931,79 +1297,6 @@ def data_explorer(data: dict[str, pd.DataFrame]) -> None:
     st.dataframe(df, use_container_width=True, hide_index=True)
 
 
-@st.cache_data(show_spinner=False, ttl=3600)
-def load_live_faostat_pp(params: tuple[tuple[str, str], ...], access_token: str | None) -> pd.DataFrame:
-    return get_domain_data("PP", list(params), access_token=access_token)
-
-
-def live_faostat(data: dict[str, pd.DataFrame]) -> None:
-    st.title("Live FAOSTAT Preview")
-    story_insight(
-        "How can this become a live monitoring workflow?",
-        "The local dashboard uses cleaned files for speed, but this page demonstrates how FAOSTAT can be queried directly for fresh producer-price records.",
-        "Use it as the technical innovation proof point, not as the main pitch path.",
-    )
-    st.caption(
-        "This page calls the FAOSTAT Producer Prices API directly. "
-        "The main dashboard still uses cleaned local files in data/processed."
-    )
-    st.info("Paste a temporary FAOSTAT token here for demos, or leave it blank to use `FAOSTAT_ACCESS_TOKEN` from `.env`.")
-    st.markdown(
-        "Get a token from the [FAOSTAT Developer Portal](https://www.fao.org/faostat/en/#developer-portal). "
-        "Tokens are short-lived, so refresh it if a request starts failing."
-    )
-
-    access_token = st.text_input(
-        "FAOSTAT access token",
-        type="password",
-        placeholder="Bearer token from FAOSTAT Developer Portal",
-        help="Stored only in the current Streamlit session. Do not paste tokens into code, README, or commits.",
-    ).strip()
-    token_for_request = access_token or None
-
-    col1, col2 = st.columns(2)
-    with col1:
-        area = st.text_input("Area code/filter", value="5501>")
-        item = st.text_input("Item code", value="809")
-        month = st.text_input("Month code", value="7021")
-    with col2:
-        years = st.multiselect("Years", ["2025", "2024", "2023", "2022", "2021"], default=["2025", "2024", "2023"])
-        elements = st.multiselect(
-            "Elements",
-            ["5530", "5532", "5539"],
-            default=["5530", "5532", "5539"],
-            help="5530 LCU/tonne, 5532 USD/tonne, 5539 Producer Price Index.",
-        )
-
-    params = (
-        ("area", area),
-        ("element", ",".join(elements)),
-        ("item", item),
-        ("year", ",".join(years)),
-        ("month", month),
-        ("output_type", "csv"),
-    )
-    st.code(
-        "https://faostatservices.fao.org/api/v1/en/data/PP?"
-        + "&".join(f"{key}={value}" for key, value in params),
-        language="text",
-    )
-
-    if st.button("Fetch Live FAOSTAT Data", type="primary"):
-        try:
-            live_df = load_live_faostat_pp(params, token_for_request)
-        except FaostatApiError as exc:
-            st.error(str(exc))
-            st.info("Paste a current token above or set FAOSTAT_ACCESS_TOKEN in your local .env file.")
-            return
-        except Exception as exc:
-            st.error(f"Could not fetch FAOSTAT data: {exc}")
-            return
-
-        st.success(f"Fetched {len(live_df):,} rows from FAOSTAT.")
-        st.dataframe(live_df, use_container_width=True, hide_index=True)
-
-
 def main() -> None:
     st.set_page_config(page_title="FAOSTAT Food Price Shocks", layout="wide")
     data = load_data()
@@ -1013,14 +1306,11 @@ def main() -> None:
         page = st.radio(
             "View",
             [
-                "Overview",
-                "Price Trends",
-                "Volatility",
-                "Global Context",
-                "Exposure Matrix",
-                "Data Explorer",
-                "Live FAOSTAT",
-                "Part 2 Pitch Brief",
+                "Slide 2 - Context",
+                "Slide 4 - Producer Signal",
+                "Slide 6 - Vulnerability",
+                "Slide 7 - What-If Action",
+                "Appendix",
             ],
         )
         st.divider()
@@ -1030,14 +1320,11 @@ def main() -> None:
         return
 
     pages = {
-        "Overview": overview,
-        "Price Trends": price_trends,
-        "Volatility": volatility,
-        "Global Context": global_context,
-        "Exposure Matrix": vulnerability,
-        "Data Explorer": data_explorer,
-        "Live FAOSTAT": live_faostat,
-        "Part 2 Pitch Brief": pitch_brief,
+        "Slide 2 - Context": slide_context,
+        "Slide 4 - Producer Signal": slide_producer_signal,
+        "Slide 6 - Vulnerability": slide_vulnerability,
+        "Slide 7 - What-If Action": slide_what_if,
+        "Appendix": appendix,
     }
     pages[page](data)
 
