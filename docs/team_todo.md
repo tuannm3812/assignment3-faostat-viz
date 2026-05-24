@@ -1,21 +1,20 @@
 # Team To-Do List
 
-## Before Part 2 Pitch
+## Part 3 Submission Focus
 
-- Confirm stakeholder hat: UN Food Systems Summit Panel or regional food-security policy board.
-- Update slides to use the phrase "hunger-import exposure", not "direct AUS/NZ vulnerability".
-- Add one methodology slide explaining normalized weighted index and pass-through.
-- Prepare one caveat slide or speaker note for Q&A.
-- Decide who will demo each app page during the 5-minute pitch.
-- Rehearse a 4 minute 30 second version so there is buffer.
+- Confirm the stakeholder framing stays consistent: UN Food Systems Summit Panel or regional food-security policy board.
+- Use the phrase "hunger-import exposure", not "direct AUS/NZ vulnerability".
+- Keep one clear methodology explanation for normalized weighted exposure and pass-through.
+- Keep one caveat section for Q&A and the final video.
+- Rehearse a 3-minute walkthrough that highlights the three advanced features.
 
 ## Dashboard Polish
 
 - Check deployed Streamlit app after each push.
 - Confirm mobile and laptop layouts are readable.
-- Test the `Exposure Matrix` sliders and country deep dive.
+- Test the `3. Vulnerability` sliders and country deep dive.
 - Confirm all charts load without missing data warnings.
-- Keep `Live FAOSTAT` as a technical page, not the main pitch focus.
+- Keep API/live data notes as technical evidence, not the main stakeholder story.
 
 ## Analysis Improvements
 
@@ -29,5 +28,5 @@
 - Add final screenshots or short descriptions of each dashboard page.
 - Add a credits section with data source links.
 - Record a 3-minute walkthrough focusing on data flow, advanced features, and limitations.
-- Check README, Part 2 doc, and Part 3 doc use consistent terminology.
+- Check README, instructions summary, and Part 3 doc use consistent terminology.
 - Ask each teammate to review one section: data, narrative, design, code, presentation.

@@ -11,21 +11,28 @@
 
 URL: https://assignment3-faostat-viz.streamlit.app/
 
+Design system:
+
+- Streamlit theme defined in `.streamlit/config.toml`.
+- Modern policy palette in `app/main.py`: ocean teal, clear blue, amber, rose, navy, and slate.
+- Plotly charts use a shared `plotly_white` template and common chart styling helper.
+
 Main views:
 
-- `Overview`
-- `Price Trends`
-- `Volatility`
-- `Global Context`
-- `Exposure Matrix`
-- `Live FAOSTAT`
-- `Data Explorer`
+The main canvas uses tabs for the narrative flow. The sidebar is reserved for global filters and model assumptions.
+
+- `Executive Brief`
+- `1. Shock Context`
+- `2. Producer Signal`
+- `3. Vulnerability`
+- `4. What-If Action`
+- `5. Evidence Base`
 
 ## Advanced Features
 
 ### Context-Aware Filtering
 
-Implemented through commodity and country controls in `Price Trends`, FFPI index selection in `Global Context`, and country selection in `Exposure Matrix`.
+Implemented through sidebar controls for year range, FFPI series, commodity, producer country, exposure weights, scenario assumptions, evidence dataset, and volatility country. Controls update the tabs where they are analytically relevant, preserving one coherent dashboard layout without implying unsupported relationships.
 
 ### Visual Tooltips
 
@@ -36,17 +43,25 @@ Implemented through Plotly hover tooltips across line charts, scatter plots, and
 Implemented through:
 
 - producer price shock slider,
+- relevant import basket share slider,
+- transmission coefficient slider,
 - producer-to-import pass-through slider,
+- food-access/import-dependency weight slider,
 - scenario pressure ranking.
+
+### Sensitivity Analysis
+
+Implemented through the `3. Vulnerability` tab. The sensitivity table and bar chart show which countries remain in the top-10 exposure group when the food-access stress weight changes from 0.40 to 0.80.
 
 ### Narrative Flow
 
-The sidebar pages follow the project story:
+The tabs follow the project story:
 
-1. What is changing in producer prices?
-2. How does this relate to global food price shocks?
-3. Who is structurally exposed?
-4. What happens under alternative shock assumptions?
+1. What is the policy decision and priority watchlist?
+2. What global food-price shocks provide the context?
+3. What producer-price signal is visible in Australia and New Zealand?
+4. Which countries are structurally exposed through hunger and import dependency?
+5. What happens under alternative shock and pass-through assumptions?
 
 ## Data Dictionary
 
@@ -89,7 +104,7 @@ Rationale:
 ### What-If Scenario
 
 ```text
-global_price_pressure = producer_price_shock x pass_through_rate
+global_price_pressure = producer_price_shock x basket_share x transmission_coeff x pass_through_rate
 implied_import_cost_pressure = food_import_pct x global_price_pressure / 100
 scenario_pressure_score = exposure_index x implied_import_cost_pressure / 100
 ```
@@ -121,9 +136,21 @@ Repository and implementation:
 
 ## Video Walkthrough Script
 
+Detailed transcript: [Part 3 Video Walkthrough Transcript](part3_video_transcript.md)
+
 1. Open the app and explain the stakeholder and question.
-2. Show `Price Trends` and crisis bands.
-3. Show `Global Context`, including FFPI correlations and crisis markers.
-4. Show `Exposure Matrix`, explain the corrected formula and pass-through slider.
-5. Open `Data Explorer` or the code briefly to show data organisation.
-6. Close with limitations and call to action.
+2. Show `Executive Brief` and the policy watchlist.
+3. Show `1. Shock Context`, including FFPI crisis markers.
+4. Show `2. Producer Signal`, including AUS/NZ producer-price alignment with FFPI.
+5. Show `3. Vulnerability` and `4. What-If Action`, explaining the exposure formula, sensitivity analysis, and scenario sliders.
+6. Open `5. Evidence Base` or the code briefly to show data organisation.
+7. Close with limitations and call to action.
+
+## Part 3 Compliance Checklist
+
+- **Hosted dashboard:** Streamlit Cloud URL included above.
+- **Consistent design system:** `.streamlit/config.toml` plus shared colour constants and chart styling in `app/main.py`.
+- **Responsive load times:** Dashboard reads cleaned local CSV files from `data/processed/` and caches loading with `st.cache_data`.
+- **Advanced features:** context-aware sidebar filters, Plotly hover tooltips, guided tab narrative, what-if parameterisation, adjustable exposure weighting, and sensitivity analysis.
+- **Technical documentation:** data dictionary, methodology, limitations, and credits are documented in this file and the README.
+- **Code organisation:** Streamlit implementation is in `app/main.py`; data preparation notebooks and API helper are separated under `notebooks/` and `src/data_pipeline/`.

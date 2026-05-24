@@ -13,7 +13,7 @@ Interactive Streamlit dashboard for exploring FAOSTAT producer prices for Austra
 
 Live app: https://assignment3-faostat-viz.streamlit.app/
 
-The main analytical dashboard runs from local cleaned CSV files. A `Live FAOSTAT` page is included for testing realtime API pulls before those data are transformed into the dashboard-ready `data/processed` tables.
+The main analytical dashboard runs from local cleaned CSV files. A FAOSTAT API helper is included for testing realtime pulls before those data are transformed into the dashboard-ready `data/processed` tables.
 
 ## Project Story
 
@@ -29,6 +29,18 @@ The main analytical layers are:
 - Global Hunger Index context.
 - Hunger-import exposure matrix combining hunger severity and food import dependency.
 - What-if scenario slider for producer price shocks.
+- Sensitivity analysis showing which priority countries remain robust across exposure-weight assumptions.
+
+## Design System
+
+The dashboard uses a consistent Streamlit and Plotly design system:
+
+- Streamlit theme settings live in `.streamlit/config.toml`.
+- Shared chart colours are defined in `app/main.py`.
+- Modern policy palette: ocean teal, clear blue, amber, rose, navy, and slate.
+- Teal and blue identify the AUS/NZ producer-price signal.
+- Amber identifies food-price shock context; rose/red is reserved for higher exposure.
+- Charts use a common white Plotly template, consistent margins, and standard hover tooltips.
 
 ## Data Scope and Enrichment Logic
 
@@ -64,12 +76,12 @@ Rationale:
 The what-if scenario is also treated as illustrative rather than causal:
 
 ```text
-global_price_pressure = producer_price_shock x pass_through_rate
+global_price_pressure = producer_price_shock x basket_share x transmission_coeff x pass_through_rate
 implied_import_cost_pressure = food_import_pct x global_price_pressure / 100
 scenario_pressure_score = exposure_index x implied_import_cost_pressure / 100
 ```
 
-The pass-through rate is controlled in the dashboard because producer prices do not translate directly into import prices. Shipping costs, exchange rates, trade margins, policy buffers, and supplier substitution can all absorb or amplify shocks.
+The basket share, transmission coefficient, and pass-through rate are controlled in the dashboard because producer prices do not translate directly into import prices. Shipping costs, exchange rates, trade margins, policy buffers, and supplier substitution can all absorb or amplify shocks.
 
 Important caveats:
 
@@ -150,7 +162,7 @@ The dashboard supports two safe ways to use a FAOSTAT token. Do not commit real 
 
 ### Option 1: Paste Token in Streamlit
 
-Open the `Live FAOSTAT` page and paste a current token into the `FAOSTAT access token` field. The field is password-style and is only used for the current Streamlit session.
+Use the local `.env` option or a current FAOSTAT token when testing API pulls with the helper module.
 
 Get a token from the [FAOSTAT Developer Portal](https://www.fao.org/faostat/en/#developer-portal). Tokens are short-lived, so refresh the token if the API request starts failing.
 
@@ -216,23 +228,27 @@ https://faostatservices.fao.org/api/v1/en/data/PP?area=5501%3E&element=5530%2C55
 Both notebooks resolve the repository root automatically, so they can be run from Jupyter after cloning without copying files into the notebook folders.
 
 - `notebooks/01_data_preparation/01_data_cleaning_pipeline.ipynb` reads from `data/raw/` and writes to `data/processed/`.
-- `notebooks/02_exploratory_analysis/04_part2_visual_story_analysis.ipynb` reads from `data/processed/` and contains the current Part 2 visual story analysis.
+- `notebooks/02_exploratory_analysis/04_part2_visual_story_analysis.ipynb` reads from `data/processed/` and contains exploratory visual story analysis from the pitch phase.
 - `app/main.py` also reads from `data/processed/`.
 
 ## Dashboard Views
 
-- `Context`: scope, data-health checkpoint, and narrative framing.
-- `Producer Signal`: Australia/New Zealand producer-price evidence and volatility.
-- `Vulnerability`: hunger and food-import exposure using the shared `vulnerability_score`.
-- `What-If Action`: parameterized shock scenario and priority-country ranking.
-- `Appendix`: data dictionary, assumptions, limitations, and transparent source tables.
+The sidebar acts as the global control panel for filters and model assumptions. The main canvas uses tabs for the narrative flow.
+
+- `Executive Brief`: stakeholder framing, priority watchlist, and recommended narrative route.
+- `1. Shock Context`: global food-price shock periods and FFPI evidence.
+- `2. Producer Signal`: Australia/New Zealand producer-price evidence and FFPI alignment.
+- `3. Vulnerability`: hunger-import exposure matrix, policy watchlist, and sensitivity analysis.
+- `4. What-If Action`: parameterized shock/pass-through scenario and priority-country ranking.
+- `5. Evidence Base`: source tables and commodity volatility checks.
 
 ## Assessment Documents
 
-- [Part 2 Persuasion Pitch](docs/part2_persuasion_pitch.md)
+- [Assignment 3 Part 3 Instructions Summary](docs/1_instructions.md)
 - [Part 3 Final Portfolio Plan](docs/part3_final_portfolio.md)
 - [Team To-Do List](docs/team_todo.md)
+- Archived Part 2 materials live under `docs/archive/`.
 
 ## Next API Step
 
-Use the `Live FAOSTAT` page to confirm API filters, then move the confirmed query into the data pipeline under `src/data_pipeline/`. The pipeline should write cleaned outputs to `data/processed/`, and the main dashboard should keep reading the same table names. That keeps the dashboard stable while the data source changes from static local files to refreshed API data.
+Use `src/data_pipeline/faostat_client.py` to confirm API filters, then move the confirmed query into the data pipeline under `src/data_pipeline/`. The pipeline should write cleaned outputs to `data/processed/`, and the main dashboard should keep reading the same table names. That keeps the dashboard stable while the data source changes from static local files to refreshed API data.
