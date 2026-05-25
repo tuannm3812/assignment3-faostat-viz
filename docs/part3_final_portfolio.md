@@ -88,7 +88,7 @@ Implemented through sliders for:
 
 ### Sensitivity Analysis
 
-The Vulnerability tab includes a sensitivity table and chart showing which countries remain in the top priority group when the food-access stress weight changes from 0.40 to 0.80.
+The What-If Action tab includes a robustness table and chart showing which countries remain in the top priority group when the food-access stress weight changes from 0.40 to 0.80.
 
 ## Data Dictionary
 

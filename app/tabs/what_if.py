@@ -6,7 +6,7 @@ import pandas as pd
 import plotly.express as px
 import streamlit as st
 
-from app.analysis import build_corrected_vulnerability, build_scenario, priority_table
+from app.analysis import build_corrected_vulnerability, build_scenario, build_weight_sensitivity, priority_table
 from app.config import CHART_TEMPLATE, RISK_SCALE
 from app.style import apply_chart_style, story_insight
 
@@ -73,6 +73,52 @@ def slide_what_if(data: dict[str, pd.DataFrame], controls: dict[str, object]) ->
 
     st.subheader("Recommended Policy Use")
     st.dataframe(priority_table(scenario, 10), width="stretch", hide_index=True)
+
+    st.subheader("Robustness Check")
+    st.caption("Tests whether priority countries remain high-risk when food-access and import-dependency weights change.")
+    sensitivity = build_weight_sensitivity(data["ghi"], data["worldbank"])
+    if not sensitivity.empty:
+        c1, c2 = st.columns([0.46, 0.54])
+        with c1:
+            st.dataframe(
+                sensitivity.head(10).round({"average_rank": 1, "average_exposure": 1}).rename(
+                    columns={
+                        "country": "Country",
+                        "appearances": "Top-10 appearances",
+                        "best_rank": "Best rank",
+                        "average_rank": "Average rank",
+                        "average_exposure": "Average exposure",
+                    }
+                ),
+                width="stretch",
+                hide_index=True,
+            )
+        with c2:
+            stability_plot = sensitivity.head(10).sort_values(
+                ["appearances", "average_exposure"],
+                ascending=[False, False],
+            )
+            fig_stability = px.bar(
+                stability_plot,
+                x="appearances",
+                y="country",
+                orientation="h",
+                color="average_exposure",
+                color_continuous_scale=RISK_SCALE,
+                labels={
+                    "appearances": "Top-10 appearances across tested weights",
+                    "country": "",
+                    "average_exposure": "Average exposure",
+                },
+                title="Priority Robustness across Food-Access Weights 0.40-0.80",
+                template=CHART_TEMPLATE,
+            )
+            apply_chart_style(fig_stability, height=390)
+            fig_stability.update_yaxes(
+                categoryorder="array",
+                categoryarray=stability_plot["country"].tolist()[::-1],
+            )
+            st.plotly_chart(fig_stability, use_container_width=True)
 
     with st.expander("Scenario assumptions and boundaries", expanded=False):
         st.markdown(
