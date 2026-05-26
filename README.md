@@ -11,6 +11,8 @@ Interactive Streamlit dashboard for exploring food-price shock signals and ident
 
 Live dashboard: https://assignment3-faostat-viz.streamlit.app/
 
+Walkthrough video: https://www.youtube.com/watch?v=5pSiKvORCVw
+
 ## 1. Run The Demo
 
 ### Streamlit Cloud

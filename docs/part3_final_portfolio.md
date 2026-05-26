@@ -4,6 +4,8 @@
 
 Streamlit app: https://assignment3-faostat-viz.streamlit.app/
 
+Walkthrough video: https://www.youtube.com/watch?v=5pSiKvORCVw
+
 The dashboard is built for a UN food-systems panel or regional food-security policy board. It turns producer-price, global food-price, hunger, and import-dependency data into an early-warning view for food-security prioritisation.
 
 ## Decision Context
