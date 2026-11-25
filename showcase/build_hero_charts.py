@@ -229,6 +229,13 @@ def band(ax, a, b, **kw):
     ax.axvspan(a - pd.Timedelta(days=15), b + pd.Timedelta(days=15), color=SHOCK, alpha=0.28, lw=0, zorder=0, **kw)
 
 
+def mark(ax, x, y, n, fs, dx=0.0, dy=0.0):
+    """Red numbered evidence marker at (x, y), offset in units of the font size."""
+    ax.annotate(str(n), (x, y), xytext=(dx * fs, dy * fs), textcoords="offset points", ha="center", va="center",
+                fontsize=fs * 0.75, fontweight="bold", color="white", annotation_clip=False, zorder=8,
+                bbox=dict(boxstyle="circle,pad=0.3", fc=MARKER, ec="white", lw=1))
+
+
 # --------------------------------------------------------------------------- charts
 def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
     """All-food index with shock months shaded and the three peaks labelled."""
@@ -264,6 +271,20 @@ def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
                     va="bottom", fontsize=fs * 1.25, fontweight="bold", color=INK)
         ax.annotate(sub, (t, v), xytext=(-fs * 1.3, -fs * 0.1), textcoords="offset points", ha="right",
                     va="top", fontsize=fs * 0.85, color=BODY)
+    if markers:
+        yoy = d["yoy"]["ffpi_food"]
+        ft = yoy.idxmax()
+        ax.annotate(f"Fastest rise: +{yoy.max():.0f}% on a year\nearlier ({ft.strftime('%b %Y')})", (ft, food[ft]),
+                    xytext=(-fs * 9.5, fs * 1.2), textcoords="offset points", fontsize=fs * 0.8, color=INK, ha="right",
+                    va="center", arrowprops=dict(arrowstyle="-", color=RULE, lw=0.8, shrinkA=2, shrinkB=3))
+        blip = pd.Timestamp("2004-04-01")
+        mark(ax, blip, food[blip] + 14, 4, fs)
+        ax.text(food.index[0] + pd.DateOffset(months=2), 102, "2014–16 average = 100", fontsize=fs * 0.78, color=BODY,
+                va="bottom")
+        low = food["1999":"2003"]
+        ax.annotate(f"Low of {low.min():.0f}\n({low.idxmin().strftime('%b %Y')})", (low.idxmin(), low.min()),
+                    xytext=(0, -fs * 2.2), textcoords="offset points", fontsize=fs * 0.78, color=BODY, ha="center",
+                    va="top")
     lt, lv = d["latest"]
     ax.scatter([lt], [lv], s=(fs * 0.6) ** 2, color="white", edgecolor=FOOD, linewidth=fs * 0.12, zorder=4)
     ax.annotate(f"{lv:.1f}\n{lt.strftime('%b %Y')}", (lt, lv), xytext=(fs * 0.6, -fs * 0.6),
@@ -271,7 +292,7 @@ def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
     return fig
 
 
-def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | None = None):
+def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | None = None, marks: bool = False):
     df, exposed, med = d["df"], d["exposed"], d["median_import"]
     fig = plt.figure(figsize=(w, h))
     ax = fig.add_axes(rect(w, h, 4.4 * fs, 0.6 * fs, 3.6 * fs, 0.2 * fs))
@@ -295,6 +316,15 @@ def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | N
         ax.annotate(short.get(r["country_ghi"], r["country_ghi"]), (r["food_import_pct"], r["ghi_2025"]),
                     xytext=(dx * fs, dy * fs), textcoords="offset points", fontsize=fs * 0.82, color=INK,
                     va="center", ha=ha)
+    if marks:
+        def at(name):
+            r = df[df["country_ghi"] == name].iloc[0]
+            return r["food_import_pct"], r["ghi_2025"]
+        x, y = at("Madagascar"); mark(ax, x, y, 1, fs, -1.4, 0)
+        x, y = at("Guinea-Bissau"); mark(ax, x, y, 2, fs, 0, 1.6)
+        x, y = at("Dem. Rep. of the Congo"); mark(ax, x, y, 3, fs, -1.4, 0)
+        ax.annotate("DR Congo", (x, y), xytext=(0.8 * fs, 0), textcoords="offset points", fontsize=fs * 0.82,
+                    color=BODY, va="center")
     ax.text(25.2, SERIOUS_HUNGER - 0.6, "Serious hunger (GHI 20+)", color=BODY, fontsize=fs * 0.8, ha="left", va="top")
     ax.text(med + 0.4, 46.4, f"Above-median food imports ({med:.1f}%+)", color=BODY, fontsize=fs * 0.8,
             ha="left", va="top")
@@ -307,7 +337,7 @@ def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | N
     return fig
 
 
-def chart_warning(d: dict, w: float, h: float, fs: float):
+def chart_warning(d: dict, w: float, h: float, fs: float, marks: bool = False):
     yoy = d["yoy"][SIGNAL_START:]
     fig = plt.figure(figsize=(w, h))
     strip = 2.6 * fs
@@ -352,6 +382,11 @@ def chart_warning(d: dict, w: float, h: float, fs: float):
         x = mid if hit else r["start"] - pd.DateOffset(months=2)
         axs.text(x, 0.2 if hit else 0.75, f"{r['lead']} mo" if hit else "none", fontsize=fs * 0.8,
                  color=INK if hit else BODY, ha="center" if hit else "right", va="center")
+    if marks:
+        sig = {r["start"].year: r for r in d["signals"]}
+        r = sig[2006]; mark(axs, r["start"], 0.75, 1, fs, 0, 1.9)
+        r = sig[2002]; mark(axs, r["start"], 0.75, 2, fs, 0, 1.9)
+        mark(ax, yoy.index[-1], float(yoy["ffpi_oils"].iloc[-1]), 3, fs, -1.2, 1.4)
     axs.text(yoy.index[0] - pd.DateOffset(months=5), 0.75, "Signal", fontsize=fs * 0.85, color=INK,
              fontweight="bold", ha="right", va="center")
     axs.text(yoy.index[0] - pd.DateOffset(months=5), 0.2, "Shock in", fontsize=fs * 0.8, color=BODY,
@@ -461,6 +496,12 @@ def chart_anatomy(d: dict, w: float, h: float, fs: float):
         ax.annotate(f"+{an['rise_pct']:.0f}%", (px, an["peak"]), xytext=(fs * 0.6, fs * 0.2), textcoords="offset points",
                     fontsize=fs * 1.2, fontweight="bold", color=INK, va="bottom")
         ax.text(49, an["base"] - 2, f"Level a year before: {an['base']:.0f}", fontsize=fs * 0.78, color=BODY, va="top", ha="right")
+        if i == 0:
+            mark(ax, 2, an["base"], 1, fs, 0, 1.3)
+        elif i == 1:
+            mark(ax, px, an["peak"], 2, fs, -1.6, 0.2)
+        else:
+            mark(ax, x[-1], float(s.values[-1]), 3, fs, -1.4, 1.4)
         ax.set_title(f"{a.year}–{str(b.year)[2:]}", loc="left", fontsize=fs * 1.1, fontweight="bold", color=INK, pad=fs * 0.6)
         ax.set_xlim(-14, 50)
         ax.set_ylim(55, 175)
@@ -514,6 +555,17 @@ def chart_ausnz(d: dict, w: float, h: float, fs: float):
         ax.annotate(lab.replace(" prices", ""), (an.index[-1], an[col].iloc[-1]), xytext=(fs * 0.6, offs[col] * fs),
                     textcoords="offset points", va="center", fontsize=fs * 0.82, color=c if col != "New Zealand" else BODY,
                     fontweight="bold" if col == "World" else "normal", annotation_clip=False)
+    for yr, n, txt in ((2008, 1, "2008: world +{w:.0f}%,\nfarm prices +{a:.0f}% and +{z:.0f}%"),
+                       (2022, 2, "2022: world +{w:.0f}%,\nfarm prices +{a:.0f}% and +{z:.0f}%")):
+        ch = an.pct_change().loc[yr] * 100
+        top, bot = an.loc[yr].max(), an.loc[yr].min()
+        ax.plot([yr, yr], [bot, top], color=MARKER, lw=1.1, zorder=5)
+        mark(ax, yr, top, n, fs, 0, 1.4)
+        late = yr == 2022
+        ax.annotate(txt.format(w=ch["World"], a=ch["Australia"], z=ch["New Zealand"]), (yr, top if late else bot),
+                    xytext=(-fs * 1.4 if late else fs * 0.6, -fs * 0.1 if late else -fs * 1.6), textcoords="offset points",
+                    fontsize=fs * 0.78, color=INK, ha="right" if late else "left", va="top")
+    mark(ax, 2018, float(an.loc[2018, "Australia"]), 3, fs, 0, -1.5)
     ax.set_ylim(0, 160)
     ax.set_yticks([0, 50, 100, 150])
     ax.set_xlim(an.index[0] - 0.5, an.index[-1] + 0.5)
