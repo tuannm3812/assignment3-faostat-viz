@@ -36,8 +36,7 @@ RENDER = HERE / "render.mjs"
 
 AUTHOR = "Manh Tuan (Mike) Nguyen"
 SCHOOL = "University of Technology Sydney"
-SUBJECT = "Data Visualisation Design and Storytelling"
-WORK = "Group assignment"
+SUBJECT = "36104 Data Visualisation Design and Storytelling"
 TITLE = ["Watch two prices.", "Protect twenty countries."]
 PROJECT = "Food Price Shock Early Warning"
 APP_URL = "https://assignment3-faostat-viz.streamlit.app/"
@@ -409,7 +408,7 @@ def build_slides(f: dict, c: dict) -> list[str]:
     # 1 cover
     pages.append(
         f'<section class="slide cover"><div class="ulogo">{logo()}</div><div class="band">'
-        f'<div class="lbl">{SUBJECT} | {WORK}</div><div class="ttl">{TITLE[0]}<br>{TITLE[1]}</div>'
+        f'<div class="lbl">{SUBJECT}</div><div class="ttl">{TITLE[0]}<br>{TITLE[1]}</div>'
         f'<div class="cs">An early-warning story from 36 years of FAO food prices, the 2025 Global Hunger Index and '
         f'World Bank trade data.</div></div>'
         f'<div class="who"><b>{AUTHOR}</b><br>{SCHOOL}<br>{DATE}</div>'
@@ -590,7 +589,7 @@ def build_poster(f: dict, c: dict) -> str:
     return f"""
 <div class="poster">
   <header>
-    <div class="top">{SUBJECT} | {WORK}</div>
+    <div class="top">{SUBJECT}</div>
     <div class="title">{TITLE[0]} {TITLE[1]}</div>
     <div class="q">When global food prices spike, which countries feel it first, and can we see it coming?</div>
     <div class="team">{AUTHOR} · {SCHOOL}</div>
