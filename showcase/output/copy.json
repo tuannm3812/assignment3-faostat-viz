@@ -14,7 +14,7 @@
         "All-food price index (2014–16 = 100)"
       ]
     ],
-    "take": "Each shock lasted more than a year, and prices have not gone back to the 2014–16 base.",
+    "take": "Each shock lasted a year or more, and each peak was higher than the one before.",
     "notes": [
       [
         "2007–08 food price crisis",
@@ -34,7 +34,7 @@
   "drivers": {
     "title": "Vegetable oils led two of the three shocks; meat never rose more than 28%",
     "subtitle": "Largest rise on a year earlier for each FAO food group during each shock period.",
-    "take": "Oils and cereals moved most in every shock, so they are the two prices the warning watches.",
+    "take": "In every shock, either oils or cereals rose most. That is why the warning watches those two prices.",
     "notes": [
       [
         "Vegetable oils",
@@ -45,8 +45,8 @@
         "Rose most in 2010–11 (+68%), and +91% in 2007–08."
       ],
       [
-        "Meat stayed calm",
-        "Never more than +28%, so it adds little warning."
+        "Dairy and sugar spiked once each",
+        "Dairy +106% in 2007–08, sugar +62% in 2010–11; neither led twice. Meat never passed +28%."
       ]
     ],
     "source": "**Source:** FAO Food Price Index sub-indices, monthly. Shock periods as defined on the previous page."
@@ -111,7 +111,7 @@
       ],
       [
         "A signal, not a forecast",
-        "The rule was read off this same history; models trained before 2013 missed most of 2020–21."
+        "The rule was read off this same history, so it still needs a test on years it has not seen."
       ]
     ],
     "source": "**Source:** FAO Food Price Index, monthly. Signal: oils and cereals both more than 20% above a year earlier, outside a shock."

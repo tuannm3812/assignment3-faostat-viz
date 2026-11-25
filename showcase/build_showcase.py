@@ -1,7 +1,7 @@
 """Build the slide deck and A1 poster for the food-price story.
 
 Outputs (showcase/output/):
-    slides/slides.html, slides/slides.pdf, slides/slide-1..7.png   16:9, 960 x 540 pt (PNG 1920 x 1080)
+    slides/slides.html, slides/slides.pdf, slides/slide-1..18.png   16:9, 960 x 540 pt (PNG 1920 x 1080)
     01-shock.png, 02-exposure.png, 03-warning.png                   hero images (copies of the chart slides)
     poster/poster.html, poster/poster-landscape.pdf, .png          A1 landscape (PNG 6000 px wide)
 
@@ -36,7 +36,7 @@ RENDER = HERE / "render.mjs"
 
 AUTHOR = "Manh Tuan (Mike) Nguyen"
 SCHOOL = "University of Technology Sydney"
-SUBJECT = "36104 Data Visualisation Design and Storytelling"
+SUBJECT = "36104 Data Visualisation and Narratives"
 TITLE = ["Watch two prices.", "Protect twenty countries."]
 PROJECT = "Food Price Shock Early Warning"
 APP_URL = "https://assignment3-faostat-viz.streamlit.app/"
@@ -135,8 +135,8 @@ def mini_signals(f: dict) -> str:
                        f'<text x="{x:.1f}" y="58" text-anchor="middle" class="ml">{lead} mo</text>')
         else:
             out.append(f'<rect x="{x - 6:.1f}" y="18" width="12" height="24" rx="2" fill="#fff" stroke="{hc.SIGNAL}" '
-                       f'stroke-width="1.5"/><text x="{x - 9:.1f}" y="34" text-anchor="end" class="ml mute">none</text>')
-    for yr in (2000, 2010, 2020):
+                       f'stroke-width="1.5"/>')
+    for yr in (2000, 2010, 2020):  # year ticks
         x = (pd.Timestamp(f"{yr}-01-01") - t0).days / span * 300
         out.append(f'<text x="{x:.1f}" y="10" text-anchor="{"start" if yr == 2000 else "middle"}" class="ml mute">{yr}</text>')
     return f'<svg viewBox="0 0 300 64" class="mini">{"".join(out)}</svg>'
@@ -203,7 +203,7 @@ def story(f: dict) -> dict:
             subtitle=f"FAO Food Price Index, all foods, monthly, {month(s['series_start'])} to {month(s['latest'][0])}.",
             legend=[("band", hc.SHOCK, f"Shock month: prices more than {s['threshold_yoy_pct']:.0f}% above a year earlier"),
                     ("line", hc.FOOD, "All-food price index (2014–16 = 100)")],
-            take="Each shock lasted more than a year, and prices have not gone back to the 2014–16 base.",
+            take="Each shock lasted a year or more, and each peak was higher than the one before.",
             notes=[
                 ("2007–08 food price crisis", f"Peak **{pk[0][1]}** in {month(pk[0][0])}; oils rose {drv[k[0]]['Vegetable oils']:.0f}% on a year earlier."),
                 ("2010–11 price spike", f"Peak **{pk[1][1]}** in {month(pk[1][0])}; cereals rose {drv[k[1]]['Cereals']:.0f}%."),
@@ -215,11 +215,12 @@ def story(f: dict) -> dict:
         "drivers": dict(
             title=f"Vegetable oils led two of the three shocks; meat never rose more than {max(r['values'][4] for r in dr['rows']):.0f}%",
             subtitle="Largest rise on a year earlier for each FAO food group during each shock period.",
-            take="Oils and cereals moved most in every shock, so they are the two prices the warning watches.",
+            take="In every shock, either oils or cereals rose most. That is why the warning watches those two prices.",
             notes=[
                 ("Vegetable oils", f"Rose most in {k[0]} (+{drv[k[0]]['Vegetable oils']:.0f}%) and {k[2]} (+{drv[k[2]]['Vegetable oils']:.0f}%)."),
                 ("Cereals", f"Rose most in {k[1]} (+{drv[k[1]]['Cereals']:.0f}%), and +{drv[k[0]]['Cereals']:.0f}% in {k[0]}."),
-                ("Meat stayed calm", f"Never more than +{max(r['values'][4] for r in dr['rows']):.0f}%, so it adds little warning."),
+                ("Dairy and sugar spiked once each", f"Dairy +{drv[k[0]]['Dairy']:.0f}% in {k[0]}, sugar +{drv[k[1]]['Sugar']:.0f}% in {k[1]}; "
+                 f"neither led twice. Meat never passed +{max(r['values'][4] for r in dr['rows']):.0f}%."),
             ],
             source="**Source:** FAO Food Price Index sub-indices, monthly. Shock periods as defined on the previous page.",
         ),
@@ -241,7 +242,7 @@ def story(f: dict) -> dict:
             notes=[
                 (f"{w['followed_by_shock_within_12m']} of {w['signals']} signals hit", f"A shock followed {leads[0]} to {leads[-1]} months later."),
                 ("One false alarm", "The 2002 signal was not followed by a shock."),
-                ("A signal, not a forecast", "The rule was read off this same history; models trained before 2013 missed most of 2020–21."),
+                ("A signal, not a forecast", "The rule was read off this same history, so it still needs a test on years it has not seen."),
             ],
             source="**Source:** FAO Food Price Index, monthly. Signal: oils and cereals both more than 20% above a year earlier, outside a shock.",
         ),
@@ -325,7 +326,7 @@ h1 { position: absolute; left: 43.5pt; right: 41pt; top: 66pt; font-size: 20pt; 
 .heat { width: 100%; border-collapse: separate; border-spacing: 3pt; margin-top: 8pt; }
 .heat th { font-size: 8pt; font-weight: 700; color: #5A6370; text-align: center; padding: 3pt; }
 .heat tr th:first-child { text-align: left; color: #1B2430; font-size: 10pt; width: 70pt; }
-.heat td { text-align: center; font-size: 14pt; font-weight: 700; height: 62pt; border-radius: 2pt; }
+.heat td { text-align: center; font-size: 15pt; font-weight: 700; height: 80pt; border-radius: 2pt; }
 .heat td.lead { outline: 2.5pt solid #1B2430; outline-offset: -2.5pt; }
 .hscale { display: flex; align-items: center; gap: 6pt; font-size: 7pt; color: #5A6370; margin: 10pt 0 0 76pt; flex-wrap: wrap; }
 .hscale i { width: 120pt; height: 7pt; border-radius: 1pt; }
@@ -402,79 +403,476 @@ def cover_art() -> str:
     return f'<svg viewBox="0 0 {len(s) * 12} 172" role="img" aria-label="Annual FAO Food Price Index as stacked pills">{"".join(cols)}</svg>'
 
 
+EXTRA_CSS = """
+.card { height: 300pt; }
+.card .mini { margin-top: 14pt; }
+.stats { display: grid; grid-template-columns: 1fr 1fr; gap: 8pt; margin-top: auto; padding-top: 10pt; }
+.stats div { background: #fff; padding: 6pt 8pt; }
+.stats b { display: block; font-size: 13pt; }
+.stats span { font-size: 7pt; color: #5A6370; line-height: 1.3; display: block; margin-top: 1pt; }
+.card .stats + p { margin-top: 10pt; }
+.outs { position: absolute; left: 43.5pt; right: 41pt; top: 384pt; }
+.orow { display: grid; grid-template-columns: repeat(4, 1fr); gap: 10pt; }
+.orow div { border-top: 2pt solid #1B2430; padding-top: 6pt; }
+.orow b { font-size: 9pt; display: block; }
+.orow span { font-size: 7.5pt; color: #5A6370; line-height: 1.4; display: block; margin-top: 2pt; }
+.chip.dk { background: #2C3846; color: #fff; }
+.trig { font-size: 7.8pt; background: #fff; padding: 6pt 8pt; margin-top: 10pt; line-height: 1.35; }
+.tbl td:first-child { white-space: nowrap; }
+.k-ring { width: 7pt; height: 7pt; border-radius: 50%; border: 1.3px solid var(--c); background: #fff; }
+/* agenda */
+.agenda { position: absolute; left: 43.5pt; right: 41pt; top: 128pt; display: grid; grid-template-columns: repeat(4, 1fr); gap: 14pt; }
+.ag { border-top: 3pt solid var(--ca); padding-top: 12pt; height: 250pt; display: flex; flex-direction: column; }
+.ag .no { font-size: 38pt; font-weight: 700; color: var(--ca); line-height: 1; }
+.ag .lab { font-size: 6.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ca); margin-top: 10pt; }
+.ag h3 { font-size: 13pt; line-height: 1.28; margin-top: 5pt; }
+.ag ul { list-style: none; margin-top: 12pt; font-size: 8.5pt; color: #5A6370; line-height: 1.45; display: flex; flex-direction: column; gap: 5pt; }
+.ag li { padding-left: 10pt; position: relative; }
+.ag li::before { content: ''; position: absolute; left: 0; top: 5pt; width: 4pt; height: 4pt; border-radius: 50%; background: var(--ca); }
+.ag .pg { margin-top: auto; font-size: 7.5pt; color: #5A6370; border-top: 1px solid #D8DEE3; padding-top: 6pt; }
+/* question page */
+.qbox { position: absolute; left: 43.5pt; width: 420pt; top: 128pt; height: 236pt; background: #1B2430; color: #fff; padding: 20pt 22pt; display: flex; flex-direction: column; }
+.qbox small { font-size: 6.5pt; letter-spacing: .08em; font-weight: 700; color: #FDE725; }
+.qbox .qq { font-size: 21pt; line-height: 1.25; font-weight: 700; margin-top: 10pt; }
+.qbox p { margin-top: auto; font-size: 8.5pt; color: #D8DEE3; line-height: 1.45; }
+.aud { position: absolute; left: 43.5pt; width: 420pt; top: 378pt; display: grid; grid-template-columns: 1fr 1fr; gap: 12pt; }
+.aud div { background: #F4F5F6; padding: 10pt 12pt; font-size: 8.5pt; color: #5A6370; line-height: 1.4; }
+.aud b { display: block; color: #1B2430; font-size: 9.5pt; margin-bottom: 3pt; }
+.needs { position: absolute; left: 488pt; right: 41pt; top: 128pt; height: 310pt; display: flex; flex-direction: column; gap: 12pt; }
+.needs .need { flex: 1; align-items: center; }
+.need { display: grid; grid-template-columns: 34pt 1fr; gap: 0 12pt; border-left: 3pt solid var(--ca); background: #F4F5F6; padding: 17pt 14pt; }
+.need .ic { width: 34pt; height: 34pt; border-radius: 50%; background: #fff; display: grid; place-items: center; color: var(--ca); }
+.need .ic svg { width: 17pt; height: 17pt; }
+.need small { font-size: 6.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ca); }
+.need h3 { font-size: 12pt; margin-top: 2pt; }
+.need p { font-size: 8.5pt; color: #5A6370; margin-top: 3pt; line-height: 1.4; }
+/* flow */
+.flow { position: absolute; left: 43.5pt; right: 41pt; top: 126pt; display: grid; grid-template-columns: 232pt 16pt 170pt 16pt 1fr; align-items: stretch; }
+.fcol { display: flex; flex-direction: column; gap: 7pt; }
+.fh { font-size: 6.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: #5A6370; margin-bottom: 1pt; }
+.src-card { background: #F4F5F6; border-left: 3pt solid #526174; padding: 7pt 10pt; }
+.src-card b { font-size: 9pt; display: block; }
+.src-card span { font-size: 7.5pt; color: #5A6370; line-height: 1.35; display: block; margin-top: 2pt; }
+.src-card em { font-style: normal; font-weight: 700; color: #1B2430; }
+.arrow { display: grid; place-items: center; color: #89949D; font-size: 14pt; }
+.proc { background: #1B2430; color: #fff; padding: 12pt; display: flex; flex-direction: column; gap: 9pt; height: 100%; }
+.proc b { font-size: 9.5pt; }
+.proc div { font-size: 7.8pt; color: #D8DEE3; line-height: 1.4; border-top: 1px solid #5A6370; padding-top: 7pt; }
+.proc div i { font-style: normal; color: #FDE725; font-weight: 700; margin-right: 4pt; }
+.meas { border-top: 3pt solid var(--ca); background: #fff; box-shadow: inset 0 0 0 1px #D8DEE3; padding: 9pt 11pt; }
+.meas small { font-size: 6.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ca); }
+.meas h4 { font-size: 10.5pt; margin-top: 2pt; }
+.meas p { font-size: 7.8pt; color: #5A6370; line-height: 1.4; margin-top: 3pt; }
+.meas p b { color: #1B2430; }
+/* tables and pills */
+.tbl { width: 100%; border-collapse: collapse; font-size: 8.5pt; }
+.tbl th { text-align: left; font-size: 7pt; font-weight: 700; color: #5A6370; border-bottom: 1.2px solid #1B2430; padding: 0 10pt 4pt 0; }
+.tbl td { padding: 9pt 10pt 9pt 0; border-bottom: 1px solid #D8DEE3; vertical-align: middle; }
+.tbl td.n, .tbl th.n { text-align: right; font-variant-numeric: tabular-nums; }
+.tbl td b { font-size: 10pt; }
+.pill { display: inline-block; font-size: 7pt; font-weight: 700; padding: 2pt 7pt; border-radius: 9pt; }
+.pill.hit { background: #1B2430; color: #fff; }
+.pill.miss { background: #fff; color: #B8452E; box-shadow: inset 0 0 0 1.2px #B8452E; }
+.pill.never { background: #F6F1E5; color: #765718; }
+.pill.ok { background: #EAF0F6; color: #32658A; }
+.kpis { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10pt; margin-bottom: 14pt; }
+.kpi { background: #F4F5F6; border-top: 3pt solid var(--acc); padding: 9pt 11pt; }
+.kpi .v { font-size: 22pt; font-weight: 700; line-height: 1; }
+.kpi .u { font-size: 7.5pt; color: #5A6370; margin-top: 4pt; line-height: 1.35; }
+.tblnote { font-size: 7.5pt; color: #5A6370; margin-top: 8pt; line-height: 1.4; }
+/* bars */
+.bars { display: flex; flex-direction: column; gap: 12pt; margin-top: 8pt; }
+.bar { display: grid; grid-template-columns: 92pt 1fr 46pt 46pt; align-items: center; gap: 8pt; font-size: 10pt; }
+.bar .tr { position: relative; height: 28pt; background: #F4F5F6; }
+.bar .tr i { position: absolute; top: 3pt; bottom: 3pt; }
+.bar .tr u { position: absolute; top: -4pt; bottom: -4pt; width: 0; border-left: 1.3px dashed #1B2430; }
+.bar .tr s { position: absolute; top: 0; bottom: 0; width: 0; border-left: 1px solid #89949D; }
+.bar b, .bar em { text-align: right; font-variant-numeric: tabular-nums; }
+.bar em { font-style: normal; color: #5A6370; }
+.barhead { display: grid; grid-template-columns: 92pt 1fr 46pt 46pt; gap: 8pt; font-size: 7pt; font-weight: 700; color: #5A6370; border-bottom: 1.2px solid #1B2430; padding-bottom: 4pt; }
+.barhead span:nth-child(3), .barhead span:nth-child(4) { text-align: right; }
+.axisl { position: relative; height: 12pt; margin: 4pt 108pt 0 100pt; font-size: 7pt; color: #5A6370; }
+.axisl span { position: absolute; transform: translateX(-50%); }
+.cmp { background: #F4F5F6; padding: 9pt 11pt; }
+.cmp h5 { font-size: 7.5pt; color: #5A6370; font-weight: 400; margin-bottom: 5pt; }
+.cmp .r { display: grid; grid-template-columns: 70pt 1fr 32pt; align-items: center; gap: 6pt; font-size: 8pt; margin-top: 3pt; }
+.cmp .r span:last-child { text-align: right; font-weight: 700; }
+.cmp .r i { display: block; height: 8pt; }
+/* rule diagram */
+.rule { position: absolute; left: 43.5pt; right: 41pt; top: 128pt; height: 214pt; display: grid; grid-template-columns: 1fr 20pt 1fr 20pt 1fr; align-items: stretch; }
+.rstep { background: #F4F5F6; border-top: 3pt solid var(--acc); padding: 13pt 14pt; display: flex; flex-direction: column; }
+.rstep .no { width: 22pt; height: 22pt; border-radius: 50%; background: var(--acc); color: #fff; font-weight: 700; font-size: 10pt; display: grid; place-items: center; }
+.rstep h3 { font-size: 13pt; margin-top: 9pt; line-height: 1.25; }
+.rstep p { font-size: 8.5pt; color: #5A6370; margin-top: 5pt; line-height: 1.45; }
+.rstep .viz { margin-top: auto; padding-top: 10pt; }
+.rstep.dark { background: #1B2430; color: #fff; }
+.rstep.dark p { color: #D8DEE3; }
+.rstep.dark .no { background: #FDE725; color: #1B2430; }
+.chip { display: inline-flex; align-items: center; gap: 5pt; background: #fff; padding: 5pt 8pt; font-size: 8.5pt; margin: 0 4pt 4pt 0; }
+.chip i { width: 9pt; height: 9pt; border-radius: 2pt; }
+.example { position: absolute; left: 43.5pt; right: 41pt; top: 362pt; background: #F6F1E5; border-left: 3pt solid #B89245; padding: 11pt 14pt; display: grid; grid-template-columns: 110pt repeat(4, 1fr); gap: 14pt; align-items: center; }
+.example .lab { color: #765718; font-weight: 700; font-size: 6.5pt; letter-spacing: .08em; }
+.example .ex b { display: block; font-size: 17pt; line-height: 1.1; }
+.example .ex span { font-size: 7.5pt; color: #5A6370; }
+/* roadmap and limits */
+.road { position: absolute; left: 43.5pt; right: 41pt; top: 128pt; display: grid; grid-template-columns: repeat(4, 1fr); gap: 12pt; }
+.rm { background: #F4F5F6; border-top: 3pt solid var(--ca); padding: 12pt 13pt; height: 252pt; display: flex; flex-direction: column; }
+.rm .when { font-size: 6.5pt; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--ca); }
+.rm .ic { width: 30pt; height: 30pt; border-radius: 50%; background: #fff; display: grid; place-items: center; color: var(--ca); margin-top: 9pt; }
+.rm .ic svg { width: 15pt; height: 15pt; }
+.rm h3 { font-size: 12pt; margin-top: 9pt; line-height: 1.25; }
+.rm p { font-size: 8.3pt; color: #5A6370; margin-top: 5pt; line-height: 1.45; }
+.rm .who { margin-top: auto; border-top: 1px solid #D8DEE3; padding-top: 6pt; font-size: 7.5pt; color: #5A6370; }
+.rm .who b { color: #1B2430; }
+.bandtake.low { top: 398pt; }
+.limits { position: absolute; left: 43.5pt; width: 560pt; top: 128pt; display: flex; flex-direction: column; gap: 10pt; }
+.lim { display: grid; grid-template-columns: 22pt 1fr; gap: 0 10pt; background: #F4F5F6; padding: 11pt 13pt; }
+.lim .no { width: 20pt; height: 20pt; border: 1.5px solid #B8452E; color: #B8452E; border-radius: 50%; display: grid; place-items: center; font-weight: 700; font-size: 9pt; }
+.lim h3 { font-size: 11pt; }
+.lim p { font-size: 8.3pt; color: #5A6370; margin-top: 3pt; line-height: 1.45; }
+.lim p b { color: #1B2430; }
+.cta.tall { height: 230pt; }
+.appx { position: absolute; left: 43.5pt; right: 41pt; top: 124pt; }
+.appx .tbl td { font-size: 8pt; line-height: 1.4; padding: 6pt 10pt 6pt 0; }
+.appx .tbl td:first-child { font-weight: 700; width: 130pt; }
+"""
+
+ICONS.update({
+    "When": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/></svg>',
+    "Where": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 21s7-6.2 7-11.5A7 7 0 0 0 5 9.5C5 14.8 12 21 12 21z"/><circle cx="12" cy="9.5" r="2.5"/></svg>',
+    "How big": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg>',
+    "Review": '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 3-6.7L3 8"/><path d="M3 3v5h5"/></svg>',
+})
+
+
 def build_slides(f: dict, c: dict) -> list[str]:
     s, e, w = f["shock"], f["exposure"], f["warning"]
-    pages = []
+    an, ht, au, now, bt, dd = f["anatomy"], f["hunger_trend"], f["ausnz"], f["now"], f["backtest"], f["data"]
+    leads = sorted(w["lead_months"])
+    nowy = w["latest_yoy_pct"]
+    pages: list[str] = []
+    n = lambda: len(pages) + 1  # noqa: E731  page number of the slide being built
+
     # 1 cover
     pages.append(
         f'<section class="slide cover"><div class="ulogo">{logo()}</div><div class="band">'
         f'<div class="lbl">{SUBJECT}</div><div class="ttl">{TITLE[0]}<br>{TITLE[1]}</div>'
-        f'<div class="cs">An early-warning story from 36 years of FAO food prices, the 2025 Global Hunger Index and '
-        f'World Bank trade data.</div></div>'
+        f'<div class="cs">An early-warning story from 36 years of FAO food prices, the 2025 Global Hunger Index, '
+        f'World Bank trade data and Australian and New Zealand farm prices.</div></div>'
         f'<div class="who"><b>{AUTHOR}</b><br>{SCHOOL}<br>{DATE}</div>'
         f'<div class="art">{cover_art()}<p>Each column is one year of the FAO Food Price Index, one pill per 10 points; '
-        f'ochre years include shock months.</p></div></section>'
-    )
-    # 2 summary
-    leads = sorted(w["lead_months"])
+        f'ochre years include shock months.</p></div></section>')
+
+    # 2 agenda
+    chapters = [
+        ("shock", "How big are food-price shocks, and what drives them?",
+         ["Three spikes since 2007, each higher", "Prices never fully come back", "Oils or cereals lead every shock"], "6–8"),
+        ("exposure", "Who feels a global spike first?",
+         [f"{e['exposed_count']} countries: serious hunger, heavy imports", f"{ht['worse_count']} of them are getting hungrier",
+          "Big exporters barely feel it"], "9–11"),
+        ("warning", "Can two prices see a shock coming?",
+         ["A two-price rule anyone can check", f"{w['followed_by_shock_within_12m']} of {w['signals']} signals hit, "
+          f"{leads[0]}–{leads[-1]} months ahead", "Where prices stand today"], "12–15"),
+        ("next", "What should a food-security team do?", ["A monthly routine with clear triggers", "Limits, and the next test"], "16–17"),
+    ]
+    cols = "".join(
+        f'<div class="ag" style="--ca:{CH[k][1]}"><div class="no">0{i + 1}</div><div class="lab">{CH[k][0]}</div>'
+        f'<h3>{esc(q)}</h3><ul>{"".join(f"<li>{esc(b)}</li>" for b in bl)}</ul><div class="pg">Slides {pg}</div></div>'
+        for i, (k, q, bl, pg) in enumerate(chapters))
+    pages.append(slide("shock", n(), header("shock", "Agenda", overview=True) +
+        '<h1>Four questions, one early-warning routine</h1>'
+        '<div class="sub">The story moves from what is happening, to who it hurts, to how to see it coming and what to do.</div>'
+        f'<div class="agenda">{cols}</div>'
+        f'<div class="bandtake low"><span>THE ANSWER</span>Watch vegetable oils and cereals; when both pass +20%, prepare the {e["exposed_count"]} exposed countries first.</div>'))
+
+    # 3 summary
     cards = [
         ("shock", "Food-price shocks keep getting bigger", f"{s['peaks'][2][1]}", f"record index, {month(s['peaks'][2][0])}",
          mini_spark(f), f"Peaks of {s['peaks'][0][1]}, {s['peaks'][1][1]} and {s['peaks'][2][1]}; still {s['latest'][1]} today."),
         ("exposure", "Hunger and import reliance overlap", f"{e['exposed_count']} of {e['countries_plotted']}", "countries most exposed",
          mini_grid(e["exposed_count"], e["countries_plotted"]), "Serious hunger (GHI 20+) and above-median food imports."),
-        ("warning", "Two prices moved first", f"{w['followed_by_shock_within_12m']} of {w['signals']}", "signals followed by a shock",
+        ("warning", "Two prices moved first", f"{w['followed_by_shock_within_12m']} of {w['signals']}", "signals followed by a shock (hollow: false alarm)",
          mini_signals(f), f"Oils and cereals both up 20%+ came {leads[0]}–{leads[-1]} months before every shock since 2000."),
+    ]
+    stats = [
+        [(f"+{max(a['rise_pct'] for a in an):.0f}%", "largest rise in a shock"), (f"{max(a['months_in_shock'] for a in an)} mo", "longest shock")],
+        [(str(ht["serious_hunger_count"]), "countries with serious hunger"), (str(ht["worse_count"]), "of the 20 hungrier than 2016")],
+        [(f"{leads[0]}–{leads[-1]} mo", "warning before a shock"), (f"0 of {w['shock_episodes_since_2000']}", "shocks missed since 2000")],
     ]
     card_html = "".join(
         f'<div class="card" style="--ca:{CH[k][1]}"><div class="lab">{i + 1} · {CH[k][0]}</div><h3>{esc(h)}</h3>'
-        f'<div class="num">{num}</div><div class="unit">{unit}</div>{fig}<p>{esc(p)}</p></div>'
-        for i, (k, h, num, unit, fig, p) in enumerate(cards)
-    )
-    now = w["latest_yoy_pct"]
-    pages.append(slide("shock", 2,
-        header("shock", "Summary", overview=True) +
+        f'<div class="num">{num}</div><div class="unit">{unit}</div>{fig}'
+        f'<div class="stats">{"".join(f"<div><b>{v}</b><span>{t}</span></div>" for v, t in stats[i])}</div><p>{esc(p)}</p></div>'
+        for i, (k, h, num, unit, fig, p) in enumerate(cards))
+    pages.append(slide("shock", n(), header("shock", "Summary", overview=True) +
         '<h1>Food-price shocks are growing, and two prices warn of them early</h1>'
         '<div class="sub">What 36 years of FAO prices, the 2025 Global Hunger Index and World Bank trade data show.</div>'
         f'<div class="cards">{card_html}</div>'
-        f'<div class="bandtake"><span>TAKEAWAY</span>{esc(f"No warning signal in {month(now["month"])}: oils +{now["oils"]:.0f}%, cereals +{now["cereals"]:.0f}%. Watch both monthly.")}</div>'))
-    # 3 shock
-    cs = c["shock"]
-    pages.append(slide("shock", 3, header("shock", "Global food prices") +
+        f'<div class="bandtake"><span>TAKEAWAY</span>{esc(f"No warning signal in {month(nowy["month"])}: oils +{nowy["oils"]:.0f}%, cereals +{nowy["cereals"]:.0f}%. Watch both monthly.")}</div>'))
+
+    # 4 question and audience
+    needs = [
+        ("warning", "When", "When will prices spike?", "A signal that comes before the shock, from numbers published every month."),
+        ("exposure", "Where", "Where will it hurt most?", "A short list of countries where hunger and food imports meet."),
+        ("shock", "How big", "How big can it get?", f"How far prices rose in past shocks (up to +{max(a['rise_pct'] for a in an):.0f}%) and how long they stayed high."),
+    ]
+    need_html = "".join(
+        f'<div class="need" style="--ca:{CH[k][1]}"><div class="ic">{ICONS[ic]}</div><div><small>{CH[k][0]}</small>'
+        f'<h3>{esc(h)}</h3><p>{esc(p)}</p></div></div>' for k, ic, h, p in needs)
+    pages.append(slide("shock", n(), header("shock", "The question", overview=True) +
+        '<h1>A food-security board needs to know when to act, and where</h1>'
+        '<div class="sub">The project answers one decision question for people who fund and plan food support.</div>'
+        '<div class="qbox"><small>THE QUESTION</small><div class="qq">When global food prices spike, which countries '
+        'feel it first, and can we see it coming?</div><p>Narrative: a sparkline that moves between what is (price '
+        'stress today) and what could be (support in place before the next shock).</p></div>'
+        '<div class="aud"><div><b>Who it is for</b>A UN food-systems panel or a regional food-security policy board.</div>'
+        '<div><b>What they decide</b>Which countries to watch, and when to move money and supplies.</div></div>'
+        f'<div class="needs">{need_html}</div>'))
+
+    # 5 data and method
+    srcs = [
+        ("FAO Food Price Index", f"Monthly, <em>{dd['months']} months</em> ({month(s['series_start'])}–{month(s['latest'][0])}); all food plus five groups."),
+        ("Global Hunger Index 2025", f"<em>{dd['ghi_countries']} countries</em> scored; also 2000, 2008 and 2016 for trends."),
+        ("World Bank food imports", f"Food as % of merchandise imports; latest year {e['import_year_min']}–{e['import_year_max']} per country."),
+        ("FAOSTAT producer prices", f"Australia and New Zealand, <em>{au['items']} farm products</em>, {au['years'][0]}–{au['years'][1]}."),
+    ]
+    src_html = "".join(f'<div class="src-card"><b>{a}</b><span>{b}</span></div>' for a, b in srcs)
+    meas = [
+        ("shock", "Measure 1", "Shock month", f"All-food index more than <b>{s['threshold_yoy_pct']:.0f}%</b> above the same month a year earlier."),
+        ("exposure", "Measure 2", "Exposed country", f"GHI <b>20+</b> (serious hunger) and food imports above the <b>{e['median_food_import_pct']}%</b> median."),
+        ("warning", "Measure 3", "Two-price signal", "Vegetable oils <b>and</b> cereals both 20%+ above a year earlier, before a shock starts."),
+    ]
+    meas_html = "".join(f'<div class="meas" style="--ca:{CH[k][1]}"><small>{a}</small><h4>{b}</h4><p>{p}</p></div>'
+                        for k, a, b, p in meas)
+    pages.append(slide("shock", n(), header("shock", "Data and method", overview=True) +
+        '<h1>Four public datasets, joined by country, give three simple measures</h1>'
+        '<div class="sub">Every number in this deck is computed from these files by one script, so it can be checked and rerun.</div>'
+        f'<div class="flow"><div class="fcol"><div class="fh">Sources</div>{src_html}</div><div class="arrow">→</div>'
+        '<div class="fcol"><div class="fh">Prepare</div><div class="proc"><b>Clean and join</b>'
+        '<div><i>1</i>Match countries by ISO3 code across GHI and World Bank tables.</div>'
+        '<div><i>2</i>Turn monthly prices into change on a year earlier.</div>'
+        '<div><i>3</i>Flag estimated and outlier producer prices; drop outliers.</div>'
+        '<div><i>4</i>Keep import shares from 2015 or later only.</div></div></div>'
+        f'<div class="arrow">→</div><div class="fcol"><div class="fh">Measures</div>{meas_html}</div></div>'
+        '<div class="outs"><div class="fh">Outputs</div><div class="orow">'
+        '<div><b>Streamlit dashboard</b><span>Six tabs: brief, shock, producer signal, vulnerability, what-if, evidence</span></div>'
+        '<div><b>Looker Studio dashboard</b><span>Price history, peaks table and hunger map for quick sharing</span></div>'
+        '<div><b>This deck and an A1 poster</b><span>Built by one script from the same processed data</span></div>'
+        '<div><b>findings.json</b><span>Every number on these slides, saved for checking</span></div></div></div>'))
+
+    # 6 shock long view
+    cs = dict(c["shock"])
+    cs["notes"] = cs["notes"] + [("Two one-month blips", "Jul 1995 and Apr 2004 crossed the line for a single month; "
+                                  "they are shaded but not counted as major shocks.")]
+    pages.append(slide("shock", n(), header("shock", "Global food prices") +
         f'<h1>{esc(cs["title"])}</h1><div class="sub">{esc(cs["subtitle"])}</div>'
         f'<div class="left">{legend(cs["legend"])}<div class="fig">{svg("shock", 624.5, 318, 9, markers=True)}</div>'
         f'<div class="src">{esc(cs["source"])}</div></div>{right_col(cs)}'))
-    # 4 drivers
+
+    # 7 anatomy
+    rows = ""
+    for a in an:
+        lab = f"{a['start'][:4]}–{a['end'][2:4]}"
+        if a["back_to_base"]:
+            back = f'<span class="pill ok">{a["months_to_base"]} months</span>'
+        elif a is an[-1]:
+            back = '<span class="pill never">Not yet</span>'
+        else:
+            back = '<span class="pill never">Never</span>'
+        rows += (f'<tr><td><b>{lab}</b></td><td class="n">+{a["rise_pct"]:.0f}%</td><td class="n">{a["months_in_shock"]}</td>'
+                 f'<td class="n">{a["months_to_peak"]}</td><td>{back}</td></tr>')
+    table = (f'<table class="tbl"><tr><th>Shock</th><th class="n">Rise</th><th class="n">Months in shock</th>'
+             f'<th class="n">Months to peak</th><th>Back to the level a year before</th></tr>{rows}</table>')
+    pages.append(slide("shock", n(), header("shock", "Anatomy of a shock") +
+        '<h1>Prices fell after each peak, but only once came back to where the shock began</h1>'
+        '<div class="sub">All-food index around each major shock, against its level twelve months before the shock started.</div>'
+        f'<div class="left">{legend([("band", hc.SHOCK, "Shock months"), ("line", hc.FOOD, "All-food index"), ("line", hc.RULE, "Level a year before the shock")])}'
+        f'<div class="fig">{svg("anatomy", 624.5, 300, 9)}</div>'
+        '<div class="src"><b>Source:</b> FAO Food Price Index, monthly. Rise: peak against the level twelve months before the first shock month.</div></div>'
+        f'<div class="right"><div class="take"><span class="lab">TAKEAWAY</span>{esc(f"Each shock resets the floor. After 2008 the index never fell back to {an[0]["base"]:.0f}; today it is {s["latest"][1]}.")}</div>'
+        f'{table}<div class="tblnote">{esc(f"The 2010–11 rise was the fastest: {an[1]["months_to_peak"]} months from the first shock month to the peak.")}</div></div>'))
+
+    # 8 drivers
     cd = c["drivers"]
-    pages.append(slide("shock", 4, header("shock", "What drove each shock") +
+    pages.append(slide("shock", n(), header("shock", "What drove each shock") +
         f'<h1>{esc(cd["title"])}</h1><div class="sub">{esc(cd["subtitle"])}</div>'
         f'<div class="left">{heat_table(f)}<div class="src">{esc(cd["source"])}</div></div>{right_col(cd)}'))
-    # 5 exposure
-    ce = c["exposure"]
-    pages.append(slide("exposure", 5, header("exposure", "Who feels it first") +
+
+    # 9 exposure scatter
+    ce = dict(c["exposure"])
+    hl = ht["high_hunger_low_import"]
+    ce["notes"] = [
+        (f"{ht['serious_hunger_count']} countries have serious hunger", f"{e['exposed_count']} of them also import a large share of their food."),
+        ("Hungry but less exposed", f"{hl[0].replace('Dem. Rep. of the Congo', 'DR Congo')}, {hl[1]} and {hl[2]} import little food, so world prices reach them less directly."),
+    ]
+    pages.append(slide("exposure", n(), header("exposure", "Who feels it first") +
         f'<h1>{esc(ce["title"])}</h1><div class="sub">{esc(ce["subtitle"])}</div>'
-        f'<div class="left">{legend(ce["legend"])}<div class="fig">{svg("exposure", 624.5, 318, 9)}</div>'
-        f'<div class="src">{esc(ce["source"])}</div></div>{right_col(ce, ranked(f))}'))
-    # 6 warning
+        f'<div class="left">{legend(ce["legend"])}<div class="fig">{svg("exposure", 624.5, 318, 9, labels=[x[0] for x in e["exposed"][:10]] + ["Guinea-Bissau", "Djibouti"])}</div>'
+        f'<div class="src">{esc(ce["source"])}</div></div>{right_col(ce, ranked(f, 6))}'))
+
+    # 10 hunger trend
+    wz = ht["worse"]
+    pages.append(slide("exposure", n(), header("exposure", "Is it getting worse?") +
+        f'<h1>{ht["worse_count"]} of the {ht["of"]} exposed countries are hungrier than in 2016, Haiti most of all</h1>'
+        '<div class="sub">Global Hunger Index in 2016 and 2025 for the exposed countries, highest hunger at the top.</div>'
+        f'<div class="left">{legend([("dot", hc.EXPOSED, "Hungrier in 2025"), ("dot", hc.OTHER, "Less hungry in 2025"), ("ring", hc.BODY, "2016 score")])}'
+        f'<div class="fig">{svg("hunger", 624.5, 318, 9)}</div>'
+        '<div class="src"><b>Source:</b> Global Hunger Index 2016 and 2025. Exposed countries as defined on the previous slide.</div></div>'
+        + right_col(dict(take="The watch list cannot be set once. A third of these countries are moving the wrong way.",
+                         notes=[(f"{wz[0][0]}", f"From **{wz[0][1]}** to **{wz[0][2]}**, the largest rise, and it imports 37% of its food."),
+                                (f"{wz[1][0]} and {wz[2][0]}", f"Up {wz[1][3]} and {wz[2][3]} points, both now above 25."),
+                                (f"{ht['most_improved'][0]} improved most", f"Down {abs(ht['most_improved'][1]):.1f} points, yet still in the serious band.")]))))
+
+    # 11 Australia and New Zealand
+    c08, c22 = au["change_2008"], au["change_2022"]
+
+    def cmp(title, ch):
+        mx = max(ch.values())
+        r = "".join(f'<div class="r"><span>{k}</span><i style="width:{v / mx * 100:.0f}%;background:{col}"></i><span>+{v:.1f}%</span></div>'
+                    for k, v, col in (("World", ch["World"], hc.FOOD), ("Australia", ch["Australia"], hc.INK),
+                                      ("New Zealand", ch["New Zealand"], hc.RULE)))
+        return f'<div class="cmp"><h5>{title}</h5>{r}</div>'
+    pages.append(slide("exposure", n(), header("exposure", "The exporters' view") +
+        '<h1>Australian and New Zealand farm prices barely felt the world spikes</h1>'
+        f'<div class="sub">World food prices against the median farm-gate price index of {au["items"]} products, {au["years"][0]}–{au["years"][1]}.</div>'
+        f'<div class="left">{legend([("line", hc.FOOD, "World food prices (FAO)"), ("line", hc.INK, "Australia farm prices"), ("line", hc.RULE, "New Zealand farm prices"), ("band", hc.SHOCK, "Shock years")])}'
+        f'<div class="fig">{svg("ausnz", 624.5, 300, 9)}</div>'
+        '<div class="src"><b>Sources:</b> FAO Food Price Index (annual mean); FAOSTAT producer price indices (2014–16 = 100), median across products, outliers removed.</div></div>'
+        f'<div class="right"><div class="take"><span class="lab">TAKEAWAY</span>Big exporters are buffered. A world spike lands on the countries that buy their food abroad.</div>'
+        f'{cmp("Change on the year before, 2008", c08)}{cmp("Change on the year before, 2022", c22)}'
+        f'<div class="tblnote">{esc(f"Year-to-year changes are only weakly linked to world prices (correlation {au["corr_with_world"]["Australia"]} for Australia, {au["corr_with_world"]["New Zealand"]} for New Zealand). This is why exposure is measured by imports.")}</div></div>'))
+
+    # 12 how the rule works
+    ex = bt[2]
+    pages.append(slide("warning", n(), header("warning", "How the rule works") +
+        '<h1>The warning needs two numbers a month and one line at +20%</h1>'
+        '<div class="sub">Anyone can check it from the FAO release, without a model.</div>'
+        '<div class="rule">'
+        f'<div class="rstep"><div class="no">1</div><h3>Read two prices</h3><p>Each month, compare vegetable oils and cereals with the same month a year earlier.</p>'
+        f'<div class="viz"><span class="chip"><i style="background:{hc.OILS}"></i>Vegetable oils</span><span class="chip"><i style="background:{hc.CEREALS}"></i>Cereals</span></div></div>'
+        '<div class="arrow">→</div>'
+        '<div class="rstep"><div class="no">2</div><h3>Both above +20%?</h3><p>The signal fires only when both are more than 20% up, and no shock has started yet. One alone is not enough.</p>'
+        '<div class="viz"><span class="chip">Oils &gt; +20%</span><span class="chip">and</span><span class="chip">Cereals &gt; +20%</span></div></div>'
+        '<div class="arrow">→</div>'
+        f'<div class="rstep dark"><div class="no">3</div><h3>Prepare the {e["exposed_count"]} countries</h3><p>Since 2000 a shock followed {w["followed_by_shock_within_12m"]} of {w["signals"]} signals, {leads[0]} to {leads[-1]} months later. That is the window to move support.</p>'
+        f'<div class="viz"><span class="chip dk">{w["followed_by_shock_within_12m"]} of {w["signals"]} hit</span><span class="chip dk">{leads[0]}–{leads[-1]} months ahead</span></div></div>'
+        '</div>'
+        f'<div class="example"><span class="lab">WORKED EXAMPLE</span>'
+        f'<div class="ex"><b>{month(ex["start"])}</b><span>Signal month</span></div>'
+        f'<div class="ex"><b>+{ex["oils"]:.0f}%</b><span>Vegetable oils on a year earlier</span></div>'
+        f'<div class="ex"><b>+{ex["cereals"]:.0f}%</b><span>Cereals on a year earlier</span></div>'
+        f'<div class="ex"><b>{ex["lead"]} months</b><span>until the 2007–08 crisis began ({month(ex["shock_start"])})</span></div></div>'))
+
+    # 13 warning chart
     cw = c["warning"]
-    pages.append(slide("warning", 6, header("warning", "An early signal") +
+    pages.append(slide("warning", n(), header("warning", "An early signal") +
         f'<h1>{esc(cw["title"])}</h1><div class="sub">{esc(cw["subtitle"])}</div>'
         f'<div class="left">{legend(cw["legend"])}<div class="fig">{svg("warning", 624.5, 318, 9)}</div>'
-        f'<div class="src">{esc(cw["source"])}</div></div>{right_col(cw, gauges(f))}'))
-    # 7 next
-    steps = "".join(
-        f'<div class="step"><div class="ic">{ICONS[a]}</div><div><small>{i + 1} · {a}</small><h3>{esc(h)}</h3><p>{esc(p)}</p></div></div>'
-        for i, (a, h, p) in enumerate(c["next"])
-    )
-    pages.append(slide("next", 7, header("next", "What to do with it") +
-        '<h1>Watch two prices monthly, prepare the 20 countries, and test the rule</h1>'
-        '<div class="sub">Three steps that turn the charts into an early-warning routine.</div>'
-        f'<div class="steps">{steps}</div>'
+        f'<div class="src">{esc(cw["source"])}</div></div>{right_col(cw)}'))
+
+    # 14 back-test scorecard
+    rows = ""
+    for r in bt:
+        hit = r["lead"] is not None
+        rows += (f'<tr><td><b>{month(r["start"])}</b></td><td class="n">+{r["oils"]:.1f}%</td><td class="n">+{r["cereals"]:.1f}%</td>'
+                 f'<td>{month(r["shock_start"]) if hit else "None within 12 months"}</td>'
+                 f'<td class="n">{f"{r['lead']} mo" if hit else "–"}</td>'
+                 f'<td>{"<span class=\"pill hit\">Hit</span>" if hit else "<span class=\"pill miss\">False alarm</span>"}</td></tr>')
+    kp = (f'<div class="kpis"><div class="kpi"><div class="v">{w["followed_by_shock_within_12m"]} of {w["signals"]}</div><div class="u">signals followed by a shock within 12 months</div></div>'
+          f'<div class="kpi"><div class="v">{leads[0]}–{leads[-1]} mo</div><div class="u">warning before the shock began</div></div>'
+          f'<div class="kpi"><div class="v">0 of {w["shock_episodes_since_2000"]}</div><div class="u">shocks since 2000 that came without a signal</div></div></div>')
+    pages.append(slide("warning", n(), header("warning", "Back-test") +
+        f'<h1>Every shock since 2000 had a signal first; one signal had no shock</h1>'
+        '<div class="sub">Each two-price signal since January 2000, the price moves that set it off, and what followed.</div>'
+        f'<div class="left">{kp}<table class="tbl"><tr><th>Signal month</th><th class="n">Oils</th><th class="n">Cereals</th><th>Shock began</th><th class="n">Lead</th><th>Result</th></tr>{rows}</table>'
+        '<div class="tblnote">The April 2004 shock lasted a single month; the other three hits led into the major shocks of 2007–08, 2010–11 and 2021–22.</div>'
+        '<div class="src"><b>Source:</b> FAO Food Price Index, monthly, Jan 2000 to Mar 2026. Signal and shock as defined on slide 5.</div></div>'
+        + right_col(dict(take="The rule caught every shock since 2000, but it was read off the same history.",
+                         notes=[("Lead times are short", f"{leads[0]} to {leads[-1]} months is enough to plan, not to build new programmes."),
+                                ("False alarm in 2002", "Both prices passed +20% for three months, but the all-food index did not follow."),
+                                ("Next test", "Fix the rule on data to 2012, then score it on 2013 to 2026 alone.")]))))
+
+    # 15 today
+    gr = now["groups"]
+    lo, hi = -30, 30
+
+    def xp(v):
+        return (min(max(v, lo), hi) - lo) / (hi - lo) * 100
+    colmap = {"Vegetable oils": hc.OILS, "Cereals": hc.CEREALS, "All food": hc.FOOD}
+    bars = ""
+    for name, y, lvl in gr:
+        a, b = sorted([xp(0), xp(y)])
+        bars += (f'<div class="bar"><span>{"<b>" + name + "</b>" if name in colmap else name}</span><div class="tr"><s style="left:{xp(0):.1f}%"></s>'
+                 f'<i style="left:{a:.1f}%;width:{b - a:.1f}%;background:{colmap.get(name, hc.OTHER)}"></i><u style="left:{xp(20):.1f}%"></u></div>'
+                 f'<b>{y:+.1f}%</b><em>{lvl:.1f}</em></div>')
+    ticks = "".join(f'<span style="left:{xp(v):.1f}%">{v:+d}%</span>' if v else f'<span style="left:{xp(v):.1f}%">0</span>' for v in (-30, -20, -10, 0, 10, 20, 30))
+    oils = next(g for g in gr if g[0] == "Vegetable oils")
+    cer = next(g for g in gr if g[0] == "Cereals")
+    need = lambda g: g[2] / (1 + g[1] / 100) * 1.2  # noqa: E731  level that would be +20% on the year-ago month
+    pages.append(slide("warning", n(), header("warning", "Where we are now") +
+        f'<h1>No signal in {month(now["month"])}, but vegetable oils are already at {oils[2]:.0f}</h1>'
+        f'<div class="sub">Change on a year earlier for each FAO food group, {month(now["month"])}, against the +20% signal line.</div>'
+        f'<div class="left"><div class="barhead"><span>Food group</span><span>Change on a year earlier (dashed line: +20%)</span><span>Change</span><span>Index</span></div>'
+        f'<div class="bars">{bars}</div><div class="axisl">{ticks}</div>'
+        f'<div class="src"><b>Source:</b> FAO Food Price Index, {month(now["month"])}. Index: 2014–16 = 100.</div></div>'
+        + right_col(dict(take=f"Oils are halfway to the line; cereals are flat. Both must pass +20% for a signal.",
+                         notes=[("Oils are the highest group", f"Index **{oils[2]:.1f}**, up {oils[1]:.1f}% on a year earlier."),
+                                ("What would trigger it", f"At today's year-ago levels: oils above **{need(oils):.0f}** and cereals above **{need(cer):.0f}**."),
+                                ("All food is steady", f"**{s['latest'][1]}**, {now['below_record_pct']:.0f}% below the 2022 record but {now['above_base_pct']:.0f}% above 2014–16.")]))))
+
+    # 16 roadmap
+    road = [
+        ("warning", "Every month", "Monitor", "Check oils and cereals", "Compare both with a year earlier when the FAO index is released early each month.", "Analyst, 15 minutes",
+         "Input: two numbers from the FAO release"),
+        ("exposure", "When the signal fires", "Prepare", f"Move the {e['exposed_count']} countries forward", "Start with the hungriest importers: Madagascar, Haiti, Niger.", "Programme leads",
+         "Trigger: oils and cereals both above +20%"),
+        ("shock", "Every year", "Review", "Refresh the watch list", f"Add new hunger and import data; {wz[0][0]}, {wz[1][0]} and {wz[2][0]} are trending worse.", "Policy board",
+         "Trigger: each new Global Hunger Index"),
+        ("next", "Before relying on it", "Test", "Back-test on unseen years", "Fix the rule on data to 2012 and score it on 2013 onwards.", "Data team",
+         "Output: an honest hit rate on unseen shocks"),
+    ]
+    road_html = "".join(
+        f'<div class="rm" style="--ca:{CH[k][1]}"><div class="when">{when}</div><div class="ic">{ICONS[ic]}</div>'
+        f'<h3>{esc(h)}</h3><p>{esc(p)}</p><div class="trig">{esc(tg)}</div><div class="who"><b>Owner:</b> {who}</div></div>'
+        for k, when, ic, h, p, who, tg in road)
+    pages.append(slide("next", n(), header("next", "What to do with it") +
+        '<h1>A monthly check, a clear trigger and a yearly refresh</h1>'
+        '<div class="sub">Four steps that turn the charts into an early-warning routine.</div>'
+        f'<div class="road">{road_html}</div>'
+        f'<div class="bandtake low"><span>TAKEAWAY</span>Watch two prices monthly; when both pass +20%, the {e["exposed_count"]} exposed countries go first.</div>'))
+
+    # 17 limits and dashboard
+    lims = [
+        ("The rule was read off its own history", "The +20% line and the two prices were chosen by looking at 2000–2026, so the 4 of 5 score is in-sample. **A test on unseen years comes first.**"),
+        ("Snapshots, not live data", f"Hunger is one 2025 score and import shares are the latest year from {e['import_year_min']}–{e['import_year_max']}. **Exposure can change faster than the data.**"),
+        ("World prices are not shop prices", "Local currency, subsidies and stocks change how much of a world spike reaches a household. **Local price data would sharpen the list.**"),
+    ]
+    lim_html = "".join(f'<div class="lim"><div class="no">{i + 1}</div><div><h3>{esc(h)}</h3><p>{esc(p)}</p></div></div>'
+                       for i, (h, p) in enumerate(lims))
+    pages.append(slide("next", n(), header("next", "Limits and the dashboard") +
+        '<h1>Three limits to keep in mind, and where to explore the data</h1>'
+        '<div class="sub">What the evidence can and cannot support, and the interactive version of this story.</div>'
+        f'<div class="limits">{lim_html}</div>'
         f'<div class="cta"><h3>Explore the interactive dashboard</h3><div class="qr"><div>{qr_svg(APP_URL)}</div>'
-        f'<span>Scenarios, country filters and the full data story</span></div></div>'
-        f'<div class="data"><h4>Data and definitions</h4><b>FAO Food Price Index</b>, monthly, {month(s["series_start"])}–{month(s["latest"][0])}. '
-        f'<b>Global Hunger Index 2025.</b> <b>World Bank</b> food imports, {e["import_year_min"]}–{e["import_year_max"]}.<br>'
-        f'<b>Shock month:</b> all-food index 20%+ above a year earlier. <b>Signal:</b> oils and cereals both 20%+, outside a shock. '
-        f'<b>Exposed:</b> GHI 20+ and food imports above the {e["median_food_import_pct"]}% median.</div>'))
+        f'<span>Scenario controls, country filters and the full evidence base</span></div></div>'
+        f'<div class="data" style="top:372pt"><h4>Code and data</h4>{REPO_URL}<br>Every figure is rebuilt by <b>showcase/build_showcase.py</b> from the processed data.</div>'))
+
+    # 18 appendix
+    defs = [
+        ("FAO Food Price Index", f"Monthly price index of a basket of food commodities, 2014–16 = 100. Five groups: cereals, vegetable oils, dairy, meat, sugar. {month(s['series_start'])}–{month(s['latest'][0])}."),
+        ("Shock month", f"All-food index more than {s['threshold_yoy_pct']:.0f}% above the same month a year earlier. Runs with gaps of up to three months are joined; runs longer than six months are major shocks."),
+        ("Two-price signal", "Vegetable oils and cereals both more than 20% above a year earlier, in a month that is not already a shock month. A hit is a shock starting within 12 months."),
+        ("Global Hunger Index", f"Combines undernourishment, child stunting, child wasting and child mortality; 20–34.9 is serious. {dd['ghi_countries']} countries scored in 2025."),
+        ("Food import share", f"World Bank: food imports as % of merchandise imports, latest year from {e['import_year_min']} per country. Median across the {e['countries_plotted']} countries: {e['median_food_import_pct']}%."),
+        ("Exposed country", f"GHI 2025 of 20 or more and a food import share above the median: {e['exposed_count']} countries."),
+        ("Farm-gate prices", f"FAOSTAT producer price index for Australia and New Zealand, median across {au['items']} products per year; flagged outliers removed."),
+        ("Built with", "Python and pandas for the data, matplotlib for the charts, Streamlit and Plotly for the dashboard, Looker Studio for the shared view, and the UTS deck kit for layout (Google Sans, Viridis for data)."),
+    ]
+    rows = "".join(f"<tr><td>{a}</td><td>{esc(b)}</td></tr>" for a, b in defs)
+    pages.append(slide("next", n(), header("next", "Appendix: data and definitions") +
+        '<h1>Data and definitions</h1>'
+        '<div class="sub">Sources, thresholds and how each measure is built.</div>'
+        f'<div class="appx"><table class="tbl">{rows}</table></div>'))
     return pages
 
 
@@ -650,12 +1048,12 @@ def main() -> None:
         d.mkdir(parents=True, exist_ok=True)
         for old in d.glob("slide-*.png"):
             old.unlink()
-    (SLIDES / "slides.html").write_text(page("".join(build_slides(f, copy)), SLIDE_CSS, PROJECT))
+    (SLIDES / "slides.html").write_text(page("".join(build_slides(f, copy)), SLIDE_CSS + EXTRA_CSS, PROJECT))
     (POSTER / "poster.html").write_text(page(build_poster(f, copy), POSTER_CSS, PROJECT + " poster"))
     (OUT / "copy.json").write_text(json.dumps(copy, indent=2, ensure_ascii=False))
     subprocess.run(["node", str(RENDER), "slides", str(SLIDES / "slides.html"), str(SLIDES)], check=True)
     subprocess.run(["node", str(RENDER), "poster", str(POSTER / "poster.html"), str(POSTER)], check=True)
-    for n, name in ((3, "01-shock"), (5, "02-exposure"), (6, "03-warning")):
+    for n, name in ((6, "01-shock"), (9, "02-exposure"), (13, "03-warning")):
         shutil.copyfile(SLIDES / f"slide-{n}.png", OUT / f"{name}.png")
     print("Built slides and poster in", OUT)
 

@@ -287,7 +287,7 @@ def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | N
              "Papua New Guinea": "Papua New Guinea"}
     nudge = {"Timor-Leste": (0.7, -0.9), "Afghanistan": (0.7, 0.5), "Haiti": (0.7, 0.9), "Niger": (0.7, 0.1),
              "Sierra Leone": (0.7, 0.2), "Madagascar": (0.7, 0.3), "Liberia": (0.7, 0.2),
-             "Central African Republic": (0.7, -0.2), "Papua New Guinea": (-0.7, 0)}
+             "Central African Republic": (0.7, -0.2), "Papua New Guinea": (-0.7, 0), "Guinea-Bissau": (-0.7, 0.9)}
     chosen = exposed.head(10) if labels is None else exposed[exposed["country_ghi"].isin(labels)]
     for _, r in chosen.iterrows():
         dx, dy = nudge.get(r["country_ghi"], (0.7, 0))
@@ -366,10 +366,170 @@ def chart_warning(d: dict, w: float, h: float, fs: float):
 CHARTS = {"shock": chart_shock, "exposure": chart_exposure, "warning": chart_warning}
 
 
+def extras(d: dict) -> None:
+    """Add the deeper findings the long deck uses: shock anatomy, hunger trend, Australia/NZ, today."""
+    ffpi, yoy = d["ffpi"], d["yoy"]
+    food = ffpi["ffpi_food"]
+    f = d["findings"]
+    # anatomy of each major shock
+    anat = []
+    major = [(a, b) for a, b in d["eps"] if (b - a).days > 180]
+    for (a, b), (pt, pv) in zip(major, d["peaks"]):
+        base_t = a - pd.DateOffset(months=12)
+        base = float(food[base_t])
+        after = food[pt:]
+        back = after[after <= base]
+        anat.append({
+            "start": a.strftime("%Y-%m"), "end": b.strftime("%Y-%m"), "base_month": base_t.strftime("%Y-%m"),
+            "base": round(base, 1), "peak_month": pt.strftime("%Y-%m"), "peak": round(pv, 1),
+            "rise_pct": round((pv / base - 1) * 100, 1),
+            "months_in_shock": (b.to_period("M") - a.to_period("M")).n + 1,
+            "months_to_peak": (pt.to_period("M") - a.to_period("M")).n,
+            "back_to_base": None if back.empty else back.index[0].strftime("%Y-%m"),
+            "months_to_base": None if back.empty else (back.index[0].to_period("M") - pt.to_period("M")).n,
+            "low_after": round(float(food[pt: pt + pd.DateOffset(months=24)].min()), 1),
+        })
+    f["anatomy"] = anat
+    d["major"] = major
+    # hunger trend of the exposed countries, 2016 to 2025
+    ex = d["exposed"].copy()  # already carries every GHI year from ghi_cleaned.csv
+    ex["change"] = ex["ghi_2025"] - ex["ghi_2016"]
+    d["hunger"] = ex
+    worse = ex[ex["change"] > 0].sort_values("change", ascending=False)
+    f["hunger_trend"] = {
+        "worse_count": int(len(worse)), "of": int(len(ex)),
+        "worse": worse[["country_ghi", "ghi_2016", "ghi_2025", "change"]].round(1).values.tolist(),
+        "most_improved": ex.sort_values("change").iloc[0][["country_ghi", "change"]].tolist(),
+        "high_hunger_low_import": d["df"][(d["df"]["ghi_2025"] >= SERIOUS_HUNGER) & ~d["df"]["exposed"]]
+        .sort_values("ghi_2025", ascending=False)["country_ghi"].head(3).tolist(),
+        "serious_hunger_count": int((d["df"]["ghi_2025"] >= SERIOUS_HUNGER).sum()),
+    }
+    # Australia and New Zealand farm-gate prices against world food prices (annual)
+    pp = pd.read_csv(DATA / "master_producer_price_index.csv")
+    pp = pp[~pp["is_outlier"].astype(bool)]
+    local = pp.groupby(["country", "year"])["value"].median().unstack(0)
+    world = pd.read_csv(DATA / "ffpi_annual.csv").set_index("year")["ffpi_food"].rename("World")
+    an = local.join(world, how="inner").dropna()
+    d["ausnz"] = an
+    ch = an.pct_change() * 100
+    f["ausnz"] = {
+        "items": int(pp["item"].nunique()), "years": [int(an.index.min()), int(an.index.max())],
+        "change_2008": {k: round(float(v), 1) for k, v in ch.loc[2008].items()},
+        "change_2022": {k: round(float(v), 1) for k, v in ch.loc[2022].items()},
+        "corr_with_world": {c: round(float(ch[c].corr(ch["World"])), 2) for c in ("Australia", "New Zealand")},
+        "range": {c: [round(float(an[c].min()), 1), round(float(an[c].max()), 1)] for c in an.columns},
+    }
+    # today: every group's change on a year earlier, and its level
+    groups = {"ffpi_oils": "Vegetable oils", "ffpi_cereals": "Cereals", "ffpi_meat": "Meat",
+              "ffpi_dairy": "Dairy", "ffpi_sugar": "Sugar", "ffpi_food": "All food"}
+    f["now"] = {
+        "month": yoy.index[-1].strftime("%Y-%m"),
+        "groups": [[name, round(float(yoy[c].iloc[-1]), 1), round(float(ffpi[c].iloc[-1]), 1)] for c, name in groups.items()],
+        "below_record_pct": round((1 - float(food.iloc[-1]) / float(food.max())) * 100, 1),
+        "above_base_pct": round(float(food.iloc[-1]) - 100, 1),
+    }
+    # signal back-test detail
+    f["backtest"] = [
+        {"start": r["start"].strftime("%Y-%m"), "oils": round(float(yoy["ffpi_oils"][r["start"]]), 1),
+         "cereals": round(float(yoy["ffpi_cereals"][r["start"]]), 1),
+         "shock_start": None if r["shock_start"] is None else r["shock_start"].strftime("%Y-%m"), "lead": r["lead"]}
+        for r in d["signals"]
+    ]
+    wb = pd.read_csv(DATA / "worldbank_food_import_pct.csv")
+    f["data"] = {"months": int(len(ffpi)), "ghi_countries": int(pd.read_csv(DATA / "ghi_cleaned.csv")["ghi_2025"].notna().sum()),
+                 "wb_rows": int(wb["food_import_pct"].notna().sum()), "pp_rows": int(len(pp))}
+
+
+def chart_anatomy(d: dict, w: float, h: float, fs: float):
+    """Three small panels: the all-food index around each shock, against its level a year before."""
+    food = d["ffpi"]["ffpi_food"]
+    fig = plt.figure(figsize=(w, h))
+    n = len(d["major"])
+    gap = 1.6 * fs
+    W = w * 72
+    pw = (W - 3.0 * fs - 0.4 * fs - gap * (n - 1)) / n
+    for i, ((a, b), an) in enumerate(zip(d["major"], d["findings"]["anatomy"])):
+        left = 3.0 * fs + i * (pw + gap)
+        ax = fig.add_axes(rect(w, h, left, W - left - pw, 3.0 * fs, 2.6 * fs))
+        s = food[a - pd.DateOffset(months=14): a + pd.DateOffset(months=50)]
+        x = [(t.to_period("M") - a.to_period("M")).n for t in s.index]
+        ax.axvspan(0, (b.to_period("M") - a.to_period("M")).n, color=SHOCK, alpha=0.28, lw=0, zorder=0)
+        ax.axhline(an["base"], color=RULE, lw=0.9, ls=(0, (3, 3)), zorder=1)
+        ax.plot(x, s.values, color=FOOD, lw=fs * 0.2, zorder=3, solid_capstyle="round")
+        px = (pd.Timestamp(an["peak_month"] + "-01").to_period("M") - a.to_period("M")).n
+        ax.scatter([px], [an["peak"]], s=(fs * 0.6) ** 2, color=FOOD, edgecolor="white", linewidth=fs * 0.1, zorder=4)
+        ax.annotate(f"+{an['rise_pct']:.0f}%", (px, an["peak"]), xytext=(fs * 0.6, fs * 0.2), textcoords="offset points",
+                    fontsize=fs * 1.2, fontweight="bold", color=INK, va="bottom")
+        ax.text(49, an["base"] - 2, f"Level a year before: {an['base']:.0f}", fontsize=fs * 0.78, color=BODY, va="top", ha="right")
+        ax.set_title(f"{a.year}–{str(b.year)[2:]}", loc="left", fontsize=fs * 1.1, fontweight="bold", color=INK, pad=fs * 0.6)
+        ax.set_xlim(-14, 50)
+        ax.set_ylim(55, 175)
+        ax.set_xticks([0, 12, 24, 36, 48])
+        ax.tick_params(length=0, labelsize=fs * 0.8)
+        if i:
+            ax.set_yticklabels([])
+        ax.set_xlabel("Months from shock start", fontsize=fs * 0.78, labelpad=fs * 0.3)
+    return fig
+
+
+def chart_hunger(d: dict, w: float, h: float, fs: float):
+    """Dumbbells: GHI 2016 to 2025 for the exposed countries, worse in purple."""
+    ex = d["hunger"].sort_values("ghi_2025")
+    fig = plt.figure(figsize=(w, h))
+    ax = fig.add_axes(rect(w, h, 9.6 * fs, 3.2 * fs, 3.0 * fs, 0.4 * fs))
+    short = {"Central African Republic": "Central African Rep.", "Congo (Republic of)": "Rep. of Congo"}
+    for y, (_, r) in enumerate(ex.iterrows()):
+        worse = r["change"] > 0
+        c = EXPOSED if worse else OTHER
+        ax.plot([r["ghi_2016"], r["ghi_2025"]], [y, y], color=c, lw=fs * 0.22, zorder=2, solid_capstyle="round")
+        ax.scatter([r["ghi_2016"]], [y], s=(fs * 0.5) ** 2, color="white", edgecolor=BODY, linewidth=fs * 0.09, zorder=3)
+        ax.scatter([r["ghi_2025"]], [y], s=(fs * 0.62) ** 2, color=c, edgecolor="white", linewidth=fs * 0.06, zorder=4)
+        ax.text(14.6, y, short.get(r["country_ghi"], r["country_ghi"]), ha="right", va="center", fontsize=fs * 0.82,
+                color=INK if worse else BODY, fontweight="bold" if worse else "normal")
+        ax.text(max(r["ghi_2016"], r["ghi_2025"]) + 0.6, y, f"{r['change']:+.1f}", va="center", fontsize=fs * 0.78,
+                color=EXPOSED if worse else BODY, fontweight="bold" if worse else "normal")
+    ax.set_xlim(15, 40)
+    ax.set_ylim(-0.7, len(ex) - 0.3)
+    ax.set_yticks([])
+    ax.grid(axis="y", visible=False)
+    ax.grid(axis="x", color=HAIR, lw=0.6)
+    ax.axvline(SERIOUS_HUNGER, color=RULE, lw=0.9, ls=(0, (3, 3)))
+    ax.tick_params(length=0, labelsize=fs * 0.8)
+    ax.set_xlabel("Global Hunger Index (20+ is serious)", fontsize=fs * 0.82, labelpad=fs * 0.3)
+    return fig
+
+
+def chart_ausnz(d: dict, w: float, h: float, fs: float):
+    an = d["ausnz"]
+    fig = plt.figure(figsize=(w, h))
+    ax = fig.add_axes(rect(w, h, 2.6 * fs, 7.4 * fs, 2.0 * fs, 0.4 * fs))
+    for a, b in d["major"]:
+        ax.axvspan(a.year - 0.5, b.year + 0.5, color=SHOCK, alpha=0.28, lw=0, zorder=0)
+    ax.axhline(100, color=RULE, lw=0.8, ls=(0, (3, 3)), zorder=1)
+    style = {"World": (FOOD, "-", 0.24, "World food prices"), "Australia": (INK, "-", 0.16, "Australia farm prices"),
+             "New Zealand": (RULE, "-", 0.16, "New Zealand farm prices")}
+    offs = {"World": 0.3, "Australia": -0.3, "New Zealand": -1.6}
+    for col, (c, ls, lw, lab) in style.items():
+        ax.plot(an.index, an[col], color=c, ls=ls, lw=fs * lw, zorder=3, solid_capstyle="round")
+        ax.annotate(lab.replace(" prices", ""), (an.index[-1], an[col].iloc[-1]), xytext=(fs * 0.6, offs[col] * fs),
+                    textcoords="offset points", va="center", fontsize=fs * 0.82, color=c if col != "New Zealand" else BODY,
+                    fontweight="bold" if col == "World" else "normal", annotation_clip=False)
+    ax.set_ylim(0, 160)
+    ax.set_yticks([0, 50, 100, 150])
+    ax.set_xlim(an.index[0] - 0.5, an.index[-1] + 0.5)
+    ax.tick_params(length=0, labelsize=fs * 0.85)
+    ax.text(an.index[0] - 0.4, 158, "Index (2014–16 = 100), annual", fontsize=fs * 0.82, color=BODY, va="top")
+    return fig
+
+
+CHARTS.update({"anatomy": chart_anatomy, "hunger": chart_hunger, "ausnz": chart_ausnz})
+
+
 def main() -> dict:
     OUT.mkdir(parents=True, exist_ok=True)
     family = setup_fonts()
     d = compute()
+    extras(d)
     d["findings"]["font"] = family
     (OUT / "findings.json").write_text(json.dumps(d["findings"], indent=2, default=str))
     return d
