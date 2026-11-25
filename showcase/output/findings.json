@@ -1,0 +1,201 @@
+{
+  "font": "Google Sans Flex",
+  "shock": {
+    "threshold_yoy_pct": 20.0,
+    "major_episodes": [
+      [
+        "2007-05",
+        "2008-08"
+      ],
+      [
+        "2010-09",
+        "2011-08"
+      ],
+      [
+        "2021-03",
+        "2022-06"
+      ]
+    ],
+    "peaks": [
+      [
+        "2008-06",
+        132.7
+      ],
+      [
+        "2011-02",
+        137.7
+      ],
+      [
+        "2022-03",
+        160.2
+      ]
+    ],
+    "latest": [
+      "2026-03",
+      128.5
+    ],
+    "max_yoy_pct": [
+      "2008-03",
+      63.2
+    ]
+  },
+  "exposure": {
+    "countries_plotted": 91,
+    "import_year_min": 2015,
+    "median_food_import_pct": 16.3,
+    "serious_hunger_threshold": 20.0,
+    "exposed_count": 20,
+    "exposed": [
+      [
+        "Madagascar",
+        18.4,
+        35.8
+      ],
+      [
+        "Haiti",
+        37.3,
+        35.7
+      ],
+      [
+        "Niger",
+        37.9,
+        33.9
+      ],
+      [
+        "Central African Republic",
+        20.9,
+        33.4
+      ],
+      [
+        "Papua New Guinea",
+        16.5,
+        31.0
+      ],
+      [
+        "Liberia",
+        23.1,
+        30.0
+      ],
+      [
+        "Afghanistan",
+        26.9,
+        29.0
+      ],
+      [
+        "Sierra Leone",
+        32.3,
+        28.5
+      ],
+      [
+        "Timor-Leste",
+        28.1,
+        28.0
+      ],
+      [
+        "Benin",
+        33.3,
+        25.9
+      ],
+      [
+        "Mozambique",
+        19.6,
+        25.9
+      ],
+      [
+        "Kenya",
+        16.3,
+        25.9
+      ],
+      [
+        "Guinea-Bissau",
+        41.7,
+        25.4
+      ],
+      [
+        "Guinea",
+        26.6,
+        23.7
+      ],
+      [
+        "Congo (Republic of)",
+        21.2,
+        22.6
+      ],
+      [
+        "Djibouti",
+        38.6,
+        21.9
+      ],
+      [
+        "Rwanda",
+        22.4,
+        21.7
+      ],
+      [
+        "Zimbabwe",
+        19.0,
+        20.9
+      ],
+      [
+        "C\u00f4te d'Ivoire",
+        20.5,
+        20.4
+      ],
+      [
+        "Solomon Islands",
+        22.2,
+        20.4
+      ]
+    ]
+  },
+  "warning": {
+    "rule": "vegetable oils and cereals both >20% above a year earlier, outside a shock",
+    "period": [
+      "2000-01",
+      "2026-03"
+    ],
+    "signals": 5,
+    "followed_by_shock_within_12m": 4,
+    "lead_months": [
+      1,
+      5,
+      1,
+      4
+    ],
+    "signal_runs": [
+      [
+        "2002-09",
+        "2002-11",
+        null
+      ],
+      [
+        "2004-03",
+        "2004-03",
+        "2004-04"
+      ],
+      [
+        "2006-12",
+        "2007-04",
+        "2007-05"
+      ],
+      [
+        "2010-08",
+        "2010-08",
+        "2010-09"
+      ],
+      [
+        "2020-11",
+        "2021-02",
+        "2021-03"
+      ]
+    ],
+    "shock_starts_without_prior_signal": [],
+    "latest_yoy_pct": {
+      "month": "2026-03",
+      "oils": 13.2,
+      "cereals": 0.6,
+      "all_food": 1.0
+    },
+    "note": "Rule read off the full 2000-2026 history, not trained blind; treat as a signal to watch, not a forecast."
+  }
+}
