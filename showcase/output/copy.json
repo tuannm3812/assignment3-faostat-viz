@@ -1,7 +1,7 @@
 {
   "shock": {
     "title": "Three food-price spikes since 2007, each peak higher than the last",
-    "subtitle": "FAO Food Price Index, all foods, monthly. Peaks: 132.7 → 137.7 → 160.2. The Mar 2022 peak is the highest since the index began in 1990.",
+    "subtitle": "FAO Food Price Index, all foods, monthly, Jan 1990 to Mar 2026.",
     "legend": [
       [
         "band",
@@ -11,20 +11,54 @@
       [
         "line",
         "#3B528B",
-        "All-food price index"
+        "All-food price index (2014–16 = 100)"
       ]
     ],
-    "source": "**Source:** FAO Food Price Index (2014–16 = 100), Jan 1990 to Mar 2026. Shock months computed from year-on-year change.",
-    "takeaway": "Each shock lasted more than a year. Prices are still 128.5 today, well above the 2014–16 base of 100."
+    "take": "Each shock lasted more than a year, and prices have not gone back to the 2014–16 base.",
+    "notes": [
+      [
+        "2007–08 food price crisis",
+        "Peak **132.7** in Jun 2008; oils rose 109% on a year earlier."
+      ],
+      [
+        "2010–11 price spike",
+        "Peak **137.7** in Feb 2011; cereals rose 68%."
+      ],
+      [
+        "2021–22 surge and the war in Ukraine",
+        "Record **160.2** in Mar 2022, the highest since 1990. Still **128.5** in Mar 2026."
+      ]
+    ],
+    "source": "**Source:** FAO Food Price Index (2014–16 = 100). Shock months computed from year-on-year change."
+  },
+  "drivers": {
+    "title": "Vegetable oils led two of the three shocks; meat never rose more than 28%",
+    "subtitle": "Largest rise on a year earlier for each FAO food group during each shock period.",
+    "take": "Oils and cereals moved most in every shock, so they are the two prices the warning watches.",
+    "notes": [
+      [
+        "Vegetable oils",
+        "Rose most in 2007–08 (+109%) and 2021–22 (+125%)."
+      ],
+      [
+        "Cereals",
+        "Rose most in 2010–11 (+68%), and +91% in 2007–08."
+      ],
+      [
+        "Meat stayed calm",
+        "Never more than +28%, so it adds little warning."
+      ]
+    ],
+    "source": "**Source:** FAO Food Price Index sub-indices, monthly. Shock periods as defined on the previous page."
   },
   "exposure": {
     "title": "20 of 91 countries pair serious hunger with high food-import reliance",
-    "subtitle": "Each dot is a country. These countries buy much of their food abroad, so a global price spike lands on households that are already hungry.",
+    "subtitle": "Each dot is a country. These countries buy much of their food abroad, so a global spike reaches hungry households.",
     "legend": [
       [
         "dot",
         "#440154",
-        "Exposed: serious hunger and above-median food imports"
+        "Exposed: GHI 20+ and above-median food imports"
       ],
       [
         "dot",
@@ -32,12 +66,12 @@
         "Other countries"
       ]
     ],
-    "source": "**Sources:** Global Hunger Index 2025; World Bank, food imports (% of merchandise imports), latest year 2015–2024 per country. **Note:** labels name some of the 20 exposed countries.",
-    "takeaway": "These 20 countries are the first places to watch and prepare when a shock signal appears."
+    "take": "These 20 countries are where to prepare first when the signal appears.",
+    "source": "**Sources:** Global Hunger Index 2025; World Bank, food imports (% of merchandise imports), latest year 2015–2024. **Note:** median food-import share 16.3%."
   },
   "warning": {
     "title": "Oils and cereals rose 20% before every food-price shock since 2000",
-    "subtitle": "The two-price signal fired 5 times. 4 were followed by a shock 1 to 5 months later; one (2002) was not.",
+    "subtitle": "Year-on-year change, Jan 2000 to Mar 2026, with the two-price signal below.",
     "legend": [
       [
         "line",
@@ -62,10 +96,41 @@
       [
         "box",
         "#1B2430",
-        "Signal: oils and cereals both 20%+ above a year earlier, with months until the shock"
+        "Signal: both 20%+ above a year earlier"
       ]
     ],
-    "source": "**Source:** FAO Food Price Index, monthly, Jan 2000 to Mar 2026. **Note:** the rule was read off this same history, so it is a signal to watch, not a tested forecast.",
-    "takeaway": "No signal now. In Mar 2026 oils are +13% and cereals +1% on a year earlier."
-  }
+    "take": "No signal now: oils +13% and cereals +1% in Mar 2026.",
+    "notes": [
+      [
+        "4 of 5 signals hit",
+        "A shock followed 1 to 5 months later."
+      ],
+      [
+        "One false alarm",
+        "The 2002 signal was not followed by a shock."
+      ],
+      [
+        "A signal, not a forecast",
+        "The rule was read off this same history; models trained before 2013 missed most of 2020–21."
+      ]
+    ],
+    "source": "**Source:** FAO Food Price Index, monthly. Signal: oils and cereals both more than 20% above a year earlier, outside a shock."
+  },
+  "next": [
+    [
+      "Monitor",
+      "Check oils and cereals every month",
+      "The FAO index is published monthly; the rule needs only two numbers."
+    ],
+    [
+      "Prepare",
+      "Put the 20 exposed countries first",
+      "Pre-position support where hunger is serious and food is imported."
+    ],
+    [
+      "Test",
+      "Back-test the rule on held-out years",
+      "Fix the rule on early data, then score it on later shocks."
+    ]
+  ]
 }

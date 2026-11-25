@@ -38,6 +38,7 @@ FONTS = ROOT / "showcase" / "fonts"
 INK = "#1B2430"
 BODY = "#5A6370"
 RULE = "#89949D"
+MARKER = "#B8452E"  # numbered evidence markers, matched to the right-hand notes
 HAIR = "#D8DEE3"
 
 # Viridis data colours, one meaning each
@@ -99,6 +100,18 @@ def compute() -> dict:
             "latest": [latest_t.strftime("%Y-%m"), round(latest_v, 1)],
             "max_yoy_pct": [yoy["ffpi_food"].idxmax().strftime("%Y-%m"), round(float(yoy["ffpi_food"].max()), 1)],
         }
+    }
+
+    # drivers: the largest year-on-year rise of each food group inside each major shock
+    groups = {"ffpi_oils": "Vegetable oils", "ffpi_cereals": "Cereals", "ffpi_dairy": "Dairy",
+              "ffpi_sugar": "Sugar", "ffpi_meat": "Meat", "ffpi_food": "All food"}
+    findings["drivers"] = {
+        "groups": list(groups.values()),
+        "rows": [
+            {"shock": f"{a.year}–{str(b.year)[2:]}" if a.year != b.year else str(a.year),
+             "values": [round(float(yoy[c][a:b].max()), 1) for c in groups]}
+            for a, b in major
+        ],
     }
 
     # exposure
@@ -217,7 +230,7 @@ def band(ax, a, b, **kw):
 
 
 # --------------------------------------------------------------------------- charts
-def chart_shock(d: dict, w: float, h: float, fs: float):
+def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
     """All-food index with shock months shaded and the three peaks labelled."""
     food = d["ffpi"]["ffpi_food"]
     fig = plt.figure(figsize=(w, h))
@@ -225,21 +238,31 @@ def chart_shock(d: dict, w: float, h: float, fs: float):
     for a, b in d["eps"]:
         band(ax, a, b)
     ax.plot(food.index, food.values, color=FOOD, lw=fs * 0.2, zorder=3, solid_capstyle="round")
-    ax.set_ylim(0, 185)
+    ax.set_ylim(0, 198)
     ax.set_yticks([0, 50, 100, 150])
     ax.tick_params(length=0, labelsize=fs * 0.85, pad=fs * 0.4)
     ax.xaxis.set_major_locator(mdates.YearLocator(5))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     ax.set_xlim(food.index[0], food.index[-1] + pd.DateOffset(months=14))
-    ax.text(food.index[0], 183, "Index (2014–16 = 100)", fontsize=fs * 0.85, color=BODY, va="top")
+    ax.text(food.index[0], 196, "Index (2014–16 = 100)", fontsize=fs * 0.85, color=BODY, va="top")
     ax.axhline(100, color=RULE, lw=0.8, ls=(0, (3, 3)), zorder=1)
 
     for i, (t, v) in enumerate(d["peaks"]):
-        ax.scatter([t], [v], s=(fs * 0.7) ** 2, color=FOOD, zorder=4, edgecolor="white", linewidth=fs * 0.1)
+        if markers:  # numbered evidence marker on the peak, matched to the notes beside the chart
+            ax.annotate(str(i + 1), (t, v), ha="center", va="center", fontsize=fs * 0.75, fontweight="bold",
+                        color="white", bbox=dict(boxstyle="circle,pad=0.3", fc=MARKER, ec="white", lw=1), zorder=6)
+        else:
+            ax.scatter([t], [v], s=(fs * 0.7) ** 2, color=FOOD, zorder=4, edgecolor="white", linewidth=fs * 0.1)
         sub = t.strftime("%b %Y") + (" · record" if i == len(d["peaks"]) - 1 else "")
-        ax.annotate(f"{v:.1f}", (t, v), xytext=(-fs * 0.9, fs * 0.05), textcoords="offset points", ha="right",
+        if i == 1:  # the middle peak sits close to the first: one line to its right
+            ax.annotate(f"{v:.1f}", (t, v), xytext=(fs * 1.0, fs * 0.25), textcoords="offset points", ha="left",
+                        va="bottom", fontsize=fs * 1.25, fontweight="bold", color=INK)
+            ax.annotate(sub, (t, v), xytext=(fs * 4.6, fs * 0.3), textcoords="offset points", ha="left",
+                        va="bottom", fontsize=fs * 0.85, color=BODY)
+            continue
+        ax.annotate(f"{v:.1f}", (t, v), xytext=(-fs * 1.3, fs * 0.05), textcoords="offset points", ha="right",
                     va="bottom", fontsize=fs * 1.25, fontweight="bold", color=INK)
-        ax.annotate(sub, (t, v), xytext=(-fs * 0.9, -fs * 0.1), textcoords="offset points", ha="right",
+        ax.annotate(sub, (t, v), xytext=(-fs * 1.3, -fs * 0.1), textcoords="offset points", ha="right",
                     va="top", fontsize=fs * 0.85, color=BODY)
     lt, lv = d["latest"]
     ax.scatter([lt], [lv], s=(fs * 0.6) ** 2, color="white", edgecolor=FOOD, linewidth=fs * 0.12, zorder=4)
@@ -262,7 +285,7 @@ def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | N
                edgecolor="white", linewidth=fs * 0.08, zorder=3)
     short = {"Central African Republic": "Central African Rep.", "Congo (Republic of)": "Rep. of Congo",
              "Papua New Guinea": "Papua New Guinea"}
-    nudge = {"Timor-Leste": (0.7, -0.9), "Afghanistan": (0.7, 0.5), "Haiti": (0.7, 0.6), "Niger": (0.7, -0.4),
+    nudge = {"Timor-Leste": (0.7, -0.9), "Afghanistan": (0.7, 0.5), "Haiti": (0.7, 0.9), "Niger": (0.7, 0.1),
              "Sierra Leone": (0.7, 0.2), "Madagascar": (0.7, 0.3), "Liberia": (0.7, 0.2),
              "Central African Republic": (0.7, -0.2), "Papua New Guinea": (-0.7, 0)}
     chosen = exposed.head(10) if labels is None else exposed[exposed["country_ghi"].isin(labels)]
@@ -278,7 +301,7 @@ def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | N
     ax.set_xlim(0, 46)
     ax.set_ylim(0, 47)
     ax.set_xlabel("Food imports, % of merchandise imports", fontsize=fs * 0.85, labelpad=fs * 0.4)
-    ax.set_ylabel("Global Hunger Index 2025", fontsize=fs * 0.85, labelpad=fs * 0.4)
+    ax.set_ylabel("Hunger Index, GHI 2025", fontsize=fs * 0.85, labelpad=fs * 0.4)
     ax.tick_params(length=0, labelsize=fs * 0.85)
     ax.grid(axis="x", color=HAIR, lw=0.6)
     return fig
@@ -307,13 +330,14 @@ def chart_warning(d: dict, w: float, h: float, fs: float):
     ax.text(yoy.index[0], SHOCK_THRESHOLD + 3, "+20% line", color=INK, fontsize=fs * 0.8, va="bottom")
     ax.text(yoy.index[0], 127, "Change on a year earlier", color=BODY, fontsize=fs * 0.85, va="top")
     last = yoy.index[-1] + pd.DateOffset(months=4)
-    ends = {"ffpi_food": ("All food", FOOD, 8), "ffpi_oils": ("Vegetable oils", OILS, 22),
-            "ffpi_cereals": ("Cereals", CEREALS, -8)}
-    for col, (label, color, y) in ends.items():
-        ax.plot([yoy.index[-1], last - pd.DateOffset(months=1)], [yoy[col].iloc[-1], y], color=color, lw=0.8)
-        ax.scatter([last], [y], s=(fs * 0.55) ** 2, color=color, marker="s", zorder=5)
-        ax.text(last + pd.DateOffset(months=5), y, label, color=INK, fontsize=fs * 0.85, va="center",
-                fontweight="bold" if col == "ffpi_food" else "normal")
+    ends = {"ffpi_oils": ("Vegetable oils", OILS, 1.25), "ffpi_food": ("All food", FOOD, 0.0),
+            "ffpi_cereals": ("Cereals", CEREALS, -1.25)}
+    for col, (label, color, dy) in ends.items():
+        ax.annotate("■", (last, 10), xytext=(0, dy * fs), textcoords="offset points", color=color,
+                    fontsize=fs * 0.9, va="center", ha="center", annotation_clip=False)
+        ax.annotate(label, (last, 10), xytext=(fs * 0.9, dy * fs), textcoords="offset points", color=INK,
+                    fontsize=fs * 0.85, va="center", fontweight="bold" if col == "ffpi_food" else "normal",
+                    annotation_clip=False)
 
     axs.set_ylim(0, 1)
     axs.set_yticks([])

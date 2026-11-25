@@ -6,8 +6,8 @@ Google Sans). Every number on every output is computed from `data/processed/` an
 
 | Output | What it is |
 | --- | --- |
-| `output/slides/slides.pdf`, `slide-1..4.png` | Four 16:9 slides (960 × 540 pt, PNG 1920 × 1080): overview, shock, exposure, warning |
-| `output/01-shock.png`, `02-exposure.png`, `03-warning.png` | Hero images for the portfolio and LinkedIn (copies of slides 2 to 4) |
+| `output/slides/slides.pdf`, `slide-1..7.png` | Seven 16:9 slides (960 × 540 pt, PNG 1920 × 1080): cover, summary, shock, drivers, exposure, warning, next steps |
+| `output/01-shock.png`, `02-exposure.png`, `03-warning.png` | Hero images for the portfolio and LinkedIn (copies of slides 3, 5 and 6) |
 | `output/poster/poster-landscape.pdf`, `.png` | A1 landscape poster (PNG 6000 px wide) |
 
 | Part | Headline (computed) |
@@ -57,3 +57,8 @@ rules, the tracker and card top rules.
 - Import shares come from different years per country (2015 to 2024).
 
 Fonts: Google Sans v14.000 (SIL Open Font License, `fonts/OFL.txt`), from the official googlefonts release.
+
+Layout follows the Text-to-SQL showcase built with the same kit: split cover with a data motif, chapter tracker
+and UTS logo, finding titles, figure on the left with a takeaway and numbered notes on the right, and an A1 poster
+with an answer band, three section rows and a closing call to action with a QR code to the live dashboard.
+The UTS mark is the unchanged file from the deck kit (`assets/uts-logo.svg`); UTS owns it.
