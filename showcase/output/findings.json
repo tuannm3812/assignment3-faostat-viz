@@ -1,5 +1,4 @@
 {
-  "font": "Google Sans Flex",
   "shock": {
     "threshold_yoy_pct": 20.0,
     "major_episodes": [
@@ -30,6 +29,11 @@
         160.2
       ]
     ],
+    "record": [
+      "2022-03",
+      160.2
+    ],
+    "series_start": "1990-01",
     "latest": [
       "2026-03",
       128.5
@@ -42,6 +46,7 @@
   "exposure": {
     "countries_plotted": 91,
     "import_year_min": 2015,
+    "import_year_max": 2024,
     "median_food_import_pct": 16.3,
     "serious_hunger_threshold": 20.0,
     "exposed_count": 20,
@@ -189,6 +194,7 @@
         "2021-03"
       ]
     ],
+    "shock_episodes_since_2000": 4,
     "shock_starts_without_prior_signal": [],
     "latest_yoy_pct": {
       "month": "2026-03",
@@ -197,5 +203,6 @@
       "all_food": 1.0
     },
     "note": "Rule read off the full 2000-2026 history, not trained blind; treat as a signal to watch, not a forecast."
-  }
+  },
+  "font": "Google Sans"
 }

@@ -1,20 +1,46 @@
-# Showcase charts
+# Showcase: charts, slides and poster
 
-Three hero charts for decks, posters and the portfolio. Each covers one part of the story:
+The food-price story in three parts, drawn in the UTS deck kit style (palette A for structure, Viridis for data,
+Google Sans). Every number on every output is computed from `data/processed/` and written to
+`output/findings.json`; slide and poster copy is saved to `output/copy.json`.
 
-| Chart | Part | Headline (computed) |
-| --- | --- | --- |
-| `output/01-shock.png` | The shock | Food prices have spiked three times since 2007, each peak higher than the last |
-| `output/02-exposure.png` | The exposure | 20 of 91 countries pair serious hunger with high food-import dependence |
-| `output/03-warning.png` | The warning | Each food-price shock since 2000 followed a 20% jump in oils and cereals |
+| Output | What it is |
+| --- | --- |
+| `output/slides/slides.pdf`, `slide-1..4.png` | Four 16:9 slides (960 × 540 pt, PNG 1920 × 1080): overview, shock, exposure, warning |
+| `output/01-shock.png`, `02-exposure.png`, `03-warning.png` | Hero images for the portfolio and LinkedIn (copies of slides 2 to 4) |
+| `output/poster/poster-landscape.pdf`, `.png` | A1 landscape poster (PNG 6000 px wide) |
 
-Rebuild from the repository root:
+| Part | Headline (computed) |
+| --- | --- |
+| The shock | Three food-price spikes since 2007, each peak higher than the last (132.7, 137.7, 160.2) |
+| The exposure | 20 of 91 countries pair serious hunger with high food-import reliance |
+| The warning | Oils and cereals rose 20% before every food-price shock since 2000 (4 of 5 signals followed by a shock) |
+
+## Rebuild
+
+From the repository root (needs Node with Playwright and Chromium for the PDF and PNG step):
 
 ```bash
-python showcase/build_hero_charts.py
+python showcase/build_showcase.py
 ```
 
-Every number on a chart is written to `output/findings.json` by the same run.
+`build_hero_charts.py` holds the calculations and chart drawing; `build_showcase.py` lays out the slides and
+poster; `render.mjs` exports them.
+
+## Colours (one meaning each, everywhere)
+
+| Colour | Meaning |
+| --- | --- |
+| `#3B528B` | All-food price index |
+| `#21918C` | Vegetable oils |
+| `#35B779` | Cereals |
+| Pale `#FDE725` band | Shock months |
+| `#440154` | Exposed country |
+| `#B9C2CA` | Other countries |
+| `#1B2430` box | Signal |
+
+Chapter accents (blue for the shock, plum for the exposure, ochre for the warning) mark structure only: header
+rules, the tracker and card top rules.
 
 ## Definitions
 
@@ -30,4 +56,4 @@ Every number on a chart is written to `output/findings.json` by the same run.
   result here.
 - Import shares come from different years per country (2015 to 2024).
 
-Fonts: Google Sans if installed, else Google Sans Flex. Set `FONT_DIR` to a folder of `.ttf` files to register fonts.
+Fonts: Google Sans v14.000 (SIL Open Font License, `fonts/OFL.txt`), from the official googlefonts release.
