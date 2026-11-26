@@ -1445,6 +1445,15 @@ header .ulogo { position: absolute; }
 .rk2 td.nb { position: relative; padding-bottom: 3.2mm; }
 .rk2 td.nb i { position: absolute; right: 0; bottom: 1mm; height: 1.4mm; }
 .ml.mute { fill: #5A6370; }
+.heat { table-layout: fixed; }
+.heat tr:first-child th { vertical-align: bottom; }
+.heat tr th:first-child { width: 34mm; }
+.rk2 { table-layout: fixed; }
+.rk2 th { vertical-align: bottom; line-height: 1.15; padding: 0 0 1.5mm; }
+.rk2 th:first-child { width: 50%; }
+.rk2 td { vertical-align: middle; padding: 2mm 0 3.6mm; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.rk2 td + td, .rk2 th + th { padding-left: 4mm; }
+.rk2 td.nb i { bottom: 1.4mm; }
 """
 
 MM = 72 / 25.4  # points per mm
@@ -1461,8 +1470,8 @@ def ranked_poster(f: dict, n: int = 10) -> str:
     for c_, imp, g in f["exposure"]["exposed"][:n]:
         rows += (f'<tr><td>{flag(c_)} {html.escape(SHORT.get(c_, c_))}</td><td class="nb"><b>{g:.1f}</b><i style="width:{(g - 15) / 25 * 100:.0f}%;background:{hc.EXPOSED}"></i></td>'
                  f'<td class="nb">{imp:.1f}%<i style="width:{imp / 45 * 100:.0f}%;background:#B9C2CA"></i></td></tr>')
-    return (f'<table class="rank rk2"><tr><th>Highest hunger among the {f["exposure"]["exposed_count"]}</th>'
-            f'<th>GHI 2025</th><th>Food imports</th></tr>{rows}</table>')
+    return (f'<table class="rank rk2"><tr><th>Country</th>'
+            f'<th>Hunger<br>(GHI 2025)</th><th>Food share<br>of imports</th></tr>{rows}</table>')
 
 
 def build_poster(f: dict, c: dict) -> str:
@@ -1473,9 +1482,9 @@ def build_poster(f: dict, c: dict) -> str:
     # row 1: shock chart (8 parts) + drivers (4 parts); row 2: exposure (5) + ranked (2) + warning (5)
     r1a = (inner - 6) * 0.64 - 12
     r2a = (inner - 12) * 0.36 - 12
-    shock_fig = svg("shock", r1a * MM, 82 * MM, 22, markers=True)
-    exp_fig = svg("exposure", r2a * MM, 96 * MM, 22, labels=["Haiti", "Niger", "Madagascar", "Papua New Guinea", "Sierra Leone"], marks=True)
-    warn_fig = svg("warning", r2a * MM, 86 * MM, 22, marks=True)
+    shock_fig = svg("shock", r1a * MM, 82 * MM, 22, markers=True, poster=True)
+    exp_fig = svg("exposure", r2a * MM, 96 * MM, 22, labels=["Haiti", "Madagascar"], marks=True, poster=True)
+    warn_fig = svg("warning", r2a * MM, 86 * MM, 22, poster=True)
     cs, cd, ce, cw = c["shock"], c["drivers"], c["exposure"], c["warning"]
     ex0, hl = e["exposed"], f["hunger_trend"]["high_hunger_low_import"]
     gb = max(ex0, key=lambda x: x[1])
@@ -1516,7 +1525,7 @@ def build_poster(f: dict, c: dict) -> str:
   <div class="row" style="grid-template-columns: 36fr 22fr 42fr">
     {card('exposure', esc(f"{{k}}{e['exposed_count']} of {e['countries_plotted']}{{/k}} countries: serious hunger, high food imports"),
           legend(ce['legend']) + f'<div class="fig">{exp_fig}</div>' + pts([(ex0[0][0], f"highest hunger, GHI {ex0[0][2]}"), (gb[0], f"most import-reliant, {gb[1]:.1f}% of imports are food"), (SHORT.get(hl[0], hl[0]), "serious hunger but imports little food")]) + f'<div class="src">{esc(ce["source"])}</div>')}
-    {card('exposure', esc('The {k}hungriest{/k} of the exposed'), ranked_poster(f, 9) +
+    {card('exposure', esc(f"The {{k}}hungriest{{/k}} of the {e['exposed_count']} exposed"), ranked_poster(f, 9) +
           '<div class="src"><b>GHI:</b> Global Hunger Index 2025 (20+ is serious). <b>Food imports:</b> % of merchandise imports.</div>')}
     {card('warning', esc('{k}Oils and cereals{/k} rose 20% before every shock since 2000'),
           legend(cw['legend']) + f'<div class="fig">{warn_fig}</div>' + gauges(f) +

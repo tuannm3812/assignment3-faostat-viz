@@ -237,7 +237,7 @@ def mark(ax, x, y, n, fs, dx=0.0, dy=0.0):
 
 
 # --------------------------------------------------------------------------- charts
-def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
+def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False, poster: bool = False):
     """All-food index with shock months shaded and the three peaks labelled."""
     food = d["ffpi"]["ffpi_food"]
     fig = plt.figure(figsize=(w, h))
@@ -245,13 +245,14 @@ def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
     for a, b in d["eps"]:
         band(ax, a, b)
     ax.plot(food.index, food.values, color=FOOD, lw=fs * 0.2, zorder=3, solid_capstyle="round")
-    ax.set_ylim(0, 198)
+    ax.set_ylim(0, 212 if poster else 198)
     ax.set_yticks([0, 50, 100, 150])
     ax.tick_params(length=0, labelsize=fs * 0.85, pad=fs * 0.4)
     ax.xaxis.set_major_locator(mdates.YearLocator(5))
     ax.xaxis.set_major_formatter(mdates.DateFormatter("%Y"))
     ax.set_xlim(food.index[0], food.index[-1] + pd.DateOffset(months=14))
-    ax.text(food.index[0], 196, "Index (2014–16 = 100)", fontsize=fs * 0.85, color=BODY, va="top")
+    if not poster:  # the poster legend already names the index and its base
+        ax.text(food.index[0], 196, "Index (2014–16 = 100)", fontsize=fs * 0.85, color=BODY, va="top")
     ax.axhline(100, color=RULE, lw=0.8, ls=(0, (3, 3)), zorder=1)
 
     for i, (t, v) in enumerate(d["peaks"]):
@@ -267,9 +268,10 @@ def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
             ax.annotate(sub, (t, v), xytext=(fs * 4.6, fs * 0.3), textcoords="offset points", ha="left",
                         va="bottom", fontsize=fs * 0.85, color=BODY)
             continue
-        ax.annotate(f"{v:.1f}", (t, v), xytext=(-fs * 1.3, fs * 0.05), textcoords="offset points", ha="right",
+        up = (fs * 1.6 if i == 0 else fs * 0.5) if poster else 0.0  # lift the label clear of the rising line
+        ax.annotate(f"{v:.1f}", (t, v), xytext=(-fs * 1.3, fs * 0.05 + up), textcoords="offset points", ha="right",
                     va="bottom", fontsize=fs * 1.25, fontweight="bold", color=INK)
-        ax.annotate(sub, (t, v), xytext=(-fs * 1.3, -fs * 0.1), textcoords="offset points", ha="right",
+        ax.annotate(sub, (t, v), xytext=(-fs * 1.3, -fs * 0.1 + up), textcoords="offset points", ha="right",
                     va="top", fontsize=fs * 0.85, color=BODY)
     if markers:
         yoy = d["yoy"]["ffpi_food"]
@@ -278,13 +280,19 @@ def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
                     xytext=(-fs * 9.5, fs * 1.2), textcoords="offset points", fontsize=fs * 0.8, color=INK, ha="right",
                     va="center", arrowprops=dict(arrowstyle="-", color=RULE, lw=0.8, shrinkA=2, shrinkB=3))
         blip = pd.Timestamp("2004-04-01")
-        mark(ax, blip, food[blip] + 14, 4, fs)
+        if not poster:  # the poster has notes for markers 1-3 only
+            mark(ax, blip, food[blip] + 14, 4, fs)
         ax.text(food.index[0] + pd.DateOffset(months=2), 102, "2014–16 average = 100", fontsize=fs * 0.78, color=BODY,
                 va="bottom")
         low = food["1999":"2003"]
-        ax.annotate(f"Low of {low.min():.0f}\n({low.idxmin().strftime('%b %Y')})", (low.idxmin(), low.min()),
-                    xytext=(0, -fs * 2.2), textcoords="offset points", fontsize=fs * 0.78, color=BODY, ha="center",
-                    va="top")
+        if poster:  # one line above the trough, clear of the year labels
+            ax.annotate(f"Low of {low.min():.0f} ({low.idxmin().strftime('%b %Y')})", (low.idxmin(), low.min()),
+                        xytext=(0, fs * 0.6), textcoords="offset points", fontsize=fs * 0.78, color=BODY,
+                        ha="center", va="bottom")
+        else:
+            ax.annotate(f"Low of {low.min():.0f}\n({low.idxmin().strftime('%b %Y')})", (low.idxmin(), low.min()),
+                        xytext=(0, -fs * 2.2), textcoords="offset points", fontsize=fs * 0.78, color=BODY,
+                        ha="center", va="top")
     lt, lv = d["latest"]
     ax.scatter([lt], [lv], s=(fs * 0.6) ** 2, color="white", edgecolor=FOOD, linewidth=fs * 0.12, zorder=4)
     ax.annotate(f"{lv:.1f}\n{lt.strftime('%b %Y')}", (lt, lv), xytext=(fs * 0.6, -fs * 0.6),
@@ -292,7 +300,8 @@ def chart_shock(d: dict, w: float, h: float, fs: float, markers: bool = False):
     return fig
 
 
-def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | None = None, marks: bool = False):
+def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | None = None, marks: bool = False,
+                   poster: bool = False):
     df, exposed, med = d["df"], d["exposed"], d["median_import"]
     fig = plt.figure(figsize=(w, h))
     ax = fig.add_axes(rect(w, h, 4.4 * fs, 0.6 * fs, 3.6 * fs, 0.2 * fs))
@@ -320,12 +329,17 @@ def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | N
         def at(name):
             r = df[df["country_ghi"] == name].iloc[0]
             return r["food_import_pct"], r["ghi_2025"]
-        x, y = at("Madagascar"); mark(ax, x, y, 1, fs, -1.4, 0)
-        x, y = at("Guinea-Bissau"); mark(ax, x, y, 2, fs, 0, 1.6)
+        x, y = at("Madagascar"); mark(ax, x, y, 1, fs, *((-1.8, 0.3) if poster else (-1.4, 0)))
+        x, y = at("Guinea-Bissau"); mark(ax, x, y, 2, fs, *((0, -1.6) if poster else (0, 1.6)))
         x, y = at("Dem. Rep. of the Congo"); mark(ax, x, y, 3, fs, -1.4, 0)
         ax.annotate("DR Congo", (x, y), xytext=(0.8 * fs, 0), textcoords="offset points", fontsize=fs * 0.82,
                     color=BODY, va="center")
-    ax.text(25.2, SERIOUS_HUNGER - 0.6, "Serious hunger (GHI 20+)", color=BODY, fontsize=fs * 0.8, ha="left", va="top")
+    if poster:  # thresholds read from the axes and the legend, so no text sits on the dots
+        ax.set_xticks([10, 20, 30, 40])
+        ax.set_yticks([10, 20, 30, 40])
+    else:
+        ax.text(25.2, SERIOUS_HUNGER - 0.6, "Serious hunger (GHI 20+)", color=BODY, fontsize=fs * 0.8, ha="left",
+                va="top")
     ax.text(med + 0.4, 46.4, f"Above-median food imports ({med:.1f}%+)", color=BODY, fontsize=fs * 0.8,
             ha="left", va="top")
     ax.set_xlim(0, 46)
@@ -337,12 +351,13 @@ def chart_exposure(d: dict, w: float, h: float, fs: float, labels: list[str] | N
     return fig
 
 
-def chart_warning(d: dict, w: float, h: float, fs: float, marks: bool = False):
+def chart_warning(d: dict, w: float, h: float, fs: float, marks: bool = False, poster: bool = False):
     yoy = d["yoy"][SIGNAL_START:]
     fig = plt.figure(figsize=(w, h))
     strip = 2.6 * fs
     bottom = 2.0 * fs
-    ax = fig.add_axes(rect(w, h, 4.0 * fs, 8.4 * fs, bottom + strip + 1.0 * fs, 0.2 * fs))
+    top = 1.5 * fs if poster else 0.2 * fs
+    ax = fig.add_axes(rect(w, h, 4.0 * fs, 8.4 * fs, bottom + strip + 1.0 * fs, top))
     axs = fig.add_axes(rect(w, h, 4.0 * fs, 8.4 * fs, bottom, h * 72 - bottom - strip), sharex=ax)
     for a, b in d["shock_eps"]:
         band(ax, a, b)
@@ -353,12 +368,23 @@ def chart_warning(d: dict, w: float, h: float, fs: float, marks: bool = False):
     ax.plot(yoy.index, yoy["ffpi_oils"], color=OILS, lw=fs * 0.13, zorder=3)
     ax.plot(yoy.index, yoy["ffpi_food"], color=FOOD, lw=fs * 0.2, zorder=4)
     ax.set_ylim(-60, 130)
-    ax.set_yticks([-50, 0, 50, 100])
-    ax.set_yticklabels(["−50%", "0", "+50%", "+100%"])
+    if poster:  # the +20% line becomes a bold tick label instead of text over the lines
+        ax.set_yticks([-50, 20, 100])
+        ax.set_yticklabels(["−50%", "+20%", "+100%"])
+    else:
+        ax.set_yticks([-50, 0, 50, 100])
+        ax.set_yticklabels(["−50%", "0", "+50%", "+100%"])
     ax.tick_params(axis="x", labelbottom=False, length=0)
     ax.tick_params(axis="y", length=0, labelsize=fs * 0.85)
-    ax.text(yoy.index[0], SHOCK_THRESHOLD + 3, "+20% line", color=INK, fontsize=fs * 0.8, va="bottom")
-    ax.text(yoy.index[0], 127, "Change on a year earlier", color=BODY, fontsize=fs * 0.85, va="top")
+    if poster:
+        for t in ax.get_yticklabels():
+            if t.get_text() == "+20%":
+                t.set_fontweight("bold"); t.set_color(INK)
+        ax.text(0, 1.03, "Change on a year earlier", transform=ax.transAxes, color=BODY, fontsize=fs * 0.85,
+                va="bottom", ha="left")
+    else:
+        ax.text(yoy.index[0], SHOCK_THRESHOLD + 3, "+20% line", color=INK, fontsize=fs * 0.8, va="bottom")
+        ax.text(yoy.index[0], 127, "Change on a year earlier", color=BODY, fontsize=fs * 0.85, va="top")
     last = yoy.index[-1] + pd.DateOffset(months=4)
     ends = {"ffpi_oils": ("Vegetable oils", OILS, 1.25), "ffpi_food": ("All food", FOOD, 0.0),
             "ffpi_cereals": ("Cereals", CEREALS, -1.25)}
@@ -379,6 +405,11 @@ def chart_warning(d: dict, w: float, h: float, fs: float, marks: bool = False):
         axs.axvspan(r["start"] - pd.Timedelta(days=15), end, ymin=0.52, ymax=0.98,
                     color=SIGNAL if hit else "white", ec=SIGNAL, lw=1.0)
         mid = r["start"] + (end - r["start"]) / 2
+        if poster:  # a false alarm reads "none" in the shock row, under its own box
+            x = mid if hit else r["start"] - pd.DateOffset(months=1)
+            axs.text(x, 0.2, f"{r['lead']} mo" if hit else "none", fontsize=fs * 0.8, color=INK if hit else BODY,
+                     ha="center" if hit else "right", va="center")
+            continue
         x = mid if hit else r["start"] - pd.DateOffset(months=2)
         axs.text(x, 0.2 if hit else 0.75, f"{r['lead']} mo" if hit else "none", fontsize=fs * 0.8,
                  color=INK if hit else BODY, ha="center" if hit else "right", va="center")
