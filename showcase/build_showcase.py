@@ -1345,7 +1345,8 @@ def build_slides(f: dict, c: dict) -> list[str]:
         ("World Bank", "World Development Indicators, food imports (% of merchandise imports) (data/raw/worldbank_food_import_raw.csv)."),
         ("Cover photo", "A sack of split peas awaits distribution at a joint WFP and ACTED site in Bamako, Mali. DFID, Wikimedia Commons, CC BY 2.0."),
         ("Question photo", "Uganda refugee settlements emergency food distribution. USAID in Africa, Wikimedia Commons, public domain."),
-        ("Poster photo", "Zimbabwe food distribution. Department of Foreign Affairs and Trade (Australia), Wikimedia Commons, CC BY 2.0."),
+        ("Roadmap photo", "Zimbabwe food distribution. Department of Foreign Affairs and Trade (Australia), Wikimedia Commons, CC BY 2.0."),
+        ("Poster photo", "Uganda refugee settlements emergency food distribution. USAID in Africa, Wikimedia Commons, public domain."),
         ("Flags", "flag-icons by Panayiotis Lipiridis, MIT licence."),
         ("Logos", "Shown only to identify each data source; they remain the property of their owners."),
     ]
@@ -1435,8 +1436,11 @@ header { position: relative; }
 .foot b { color: #1B2430; }
 .ml { font: 20px 'Google Sans'; fill: #1B2430; }
 header { padding-right: 236mm; }
-.hphoto { position: absolute; right: 40mm; top: 0; width: 188mm; bottom: 0; background-size: cover; background-position: center 35%; }
-.hphoto span { position: absolute; right: 2mm; bottom: 1.5mm; font-size: 11pt; color: #fff; text-shadow: 0 0 3px rgba(0,0,0,.8); }
+.hphoto { position: absolute; right: -18mm; top: -18mm; width: 340mm; bottom: -2mm; background-size: cover; background-position: center 45%; opacity: .92;
+  -webkit-mask-image: linear-gradient(90deg, transparent 0%, rgba(0,0,0,.35) 25%, #000 60%), linear-gradient(180deg, #000 70%, transparent 100%);
+  -webkit-mask-composite: source-in; mask-composite: intersect; z-index: 0; }
+header > *:not(.hphoto) { position: relative; z-index: 1; }
+header .ulogo { position: absolute; }
 .flag { height: 5mm; width: 6.7mm; vertical-align: middle; box-shadow: 0 0 0 .2mm rgba(27,36,48,.3); margin-right: 1.5mm; }
 .rk2 td.nb { position: relative; padding-bottom: 3.2mm; }
 .rk2 td.nb i { position: absolute; right: 0; bottom: 1mm; height: 1.4mm; }
@@ -1488,7 +1492,7 @@ def build_poster(f: dict, c: dict) -> str:
     <div class="title">{TITLE[0]} {TITLE[1]}</div>
     <div class="q">When global food prices spike, which countries feel it first, and can we see it coming?</div>
     <div class="team">{AUTHOR} · {SCHOOL}</div>
-    <div class="hphoto" style="background-image:url(../../assets/photos/photo-sacks.jpg)"><span>Photo: DFAT (Australia), Zimbabwe food distribution. Wikimedia Commons, CC BY 2.0</span></div>
+    <div class="hphoto" style="background-image:url(../../assets/photos/photo-uganda-wide.jpg)"></div>
     <div class="ulogo">{logo()}</div>
   </header>
   <div class="answer">
