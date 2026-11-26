@@ -70,8 +70,8 @@ def time_chart(w, h, series, shade=None, y=(0, 260), ticks=(0, 50, 100, 150, 200
     pr, pt, pb = 12, 10, 22
     x0 = x0 or pd.Timestamp("1990-01-01")
     x1 = x1 or pd.Timestamp("2026-03-01")
-    X = lambda d: scale(d.value, x0.value, x1.value, pl, w - pr)  # noqa: E731
-    Y = lambda v: scale(v, y[0], y[1], h - pb, pt)  # noqa: E731
+    X = lambda d: scale(d.value, x0.value, x1.value, pl, w - pr)
+    Y = lambda v: scale(v, y[0], y[1], h - pb, pt)
     out = [f'<svg width="{w}" height="{h}" viewBox="0 0 {w} {h}">']
     for t in ticks:
         out.append(f'<line x1="{pl}" x2="{w-pr}" y1="{Y(t):.1f}" y2="{Y(t):.1f}" stroke="{HAIR}"/>')
@@ -157,7 +157,6 @@ def panel(title, inner, w, h, sub=""):
 
 # ---------------------------------------------------------------- tabs
 def overview():
-    lat = food.index.max()
     yoy_now = food.yoy_pct.iloc[-1]
     cards = "".join([
         card("Price index now", f"{food.price_index.iloc[-1]:.1f}", "Mar 2026, all food",
@@ -232,8 +231,8 @@ def exposure_tab():
     sw, sh = 700, 470
     pl, pb, pt, pr = 36, 30, 10, 12
     iw, ih = sw - 24, sh - 92
-    X = lambda v: scale(v, 0, 45, pl, iw - pr)  # noqa: E731
-    Y = lambda v: scale(v, 0, 40, ih - pb, pt)  # noqa: E731
+    X = lambda v: scale(v, 0, 45, pl, iw - pr)
+    Y = lambda v: scale(v, 0, 40, ih - pb, pt)
     sv = [f'<svg width="{iw}" height="{ih}">']
     for t in range(0, 41, 10):
         sv.append(f'<line x1="{pl}" x2="{iw-pr}" y1="{Y(t)}" y2="{Y(t)}" stroke="{HAIR}"/>'

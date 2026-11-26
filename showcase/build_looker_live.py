@@ -31,6 +31,20 @@ OUT = Path(__file__).parent / "output" / "looker"
 GROUPS = {"ffpi_food": "All food", "ffpi_oils": "Vegetable oils", "ffpi_cereals": "Cereals",
           "ffpi_dairy": "Dairy", "ffpi_meat": "Meat", "ffpi_sugar": "Sugar"}
 
+# ISO3 -> ISO2 for the flag images Looker shows in the exposure table (flagcdn.com)
+ISO2 = {
+    "COD": "cd", "MDG": "mg", "HTI": "ht", "NER": "ne", "CAF": "cf", "NGA": "ng", "PNG": "pg", "LBR": "lr", "AGO": "ao", "ZMB": "zm",
+    "AFG": "af", "SLE": "sl", "TLS": "tl", "PAK": "pk", "BEN": "bj", "KEN": "ke", "MOZ": "mz", "IND": "in", "GNB": "gw", "ETH": "et",
+    "GIN": "gn", "BFA": "bf", "COG": "cg", "MLI": "ml", "MWI": "mw", "DJI": "dj", "BWA": "bw", "RWA": "rw", "TZA": "tz", "ZWE": "zw",
+    "CIV": "ci", "SLB": "sb", "UGA": "ug", "MRT": "mr", "BGD": "bd", "NAM": "na", "GAB": "ga", "GTM": "gt", "TGO": "tg", "GMB": "gm",
+    "COM": "km", "CMR": "cm", "SWZ": "sz", "SEN": "sn", "MMR": "mm", "ZAF": "za", "KHM": "kh", "NPL": "np", "IDN": "id", "BOL": "bo",
+    "LBY": "ly", "MYS": "my", "PHL": "ph", "MUS": "mu", "GHA": "gh", "TJK": "tj", "HND": "hn", "LKA": "lk", "VNM": "vn", "TTO": "tt",
+    "ECU": "ec", "EGY": "eg", "SUR": "sr", "UKR": "ua", "JOR": "jo", "OMN": "om", "FJI": "fj", "THA": "th", "CPV": "cv", "MAR": "ma",
+    "LBN": "lb", "GUY": "gy", "KGZ": "kg", "JAM": "jm", "SLV": "sv", "PAN": "pa", "IRN": "ir", "PER": "pe", "DZA": "dz", "ALB": "al",
+    "ARG": "ar", "BRA": "br", "DOM": "do", "TUN": "tn", "COL": "co", "MEX": "mx", "SAU": "sa", "AZE": "az", "PRY": "py", "MDA": "md",
+    "MNG": "mn",
+}
+
 
 def monthly(d: dict) -> pd.DataFrame:
     ffpi, yoy = d["ffpi"], d["yoy"]
@@ -76,6 +90,25 @@ def signal_table(d: dict) -> pd.DataFrame:
     return out.dropna(subset=["oils_yoy"])
 
 
+def signal_runs(d: dict) -> pd.DataFrame:
+    """One row per warning signal since 2000 and the shock that followed, for the warning-tab timeline."""
+    w = d["findings"]["warning"]
+    month = lambda ym: pd.Timestamp(ym + "-01").strftime("%b %Y")  # noqa: E731
+    names = {"2004-04": "Apr 2004 spike", "2007-05": "2007-08 shock", "2010-09": "2010-11 shock",
+             "2021-03": "2021-22 shock"}
+    rows = []
+    for start, end, shock in w["signal_runs"]:
+        lead = None if shock is None else (pd.Period(shock, "M") - pd.Period(start, "M")).n
+        rows.append({
+            "signal_start": start + "-01",
+            "signal_months": month(start) if start == end else f"{month(start)} - {month(end)}",
+            "what_followed": names.get(shock, "No shock followed"),
+            "lead": "False alarm" if lead is None else f"{lead} month{'s' if lead > 1 else ''}",
+            "outcome": "False alarm" if lead is None else "Shock followed",
+        })
+    return pd.DataFrame(rows)
+
+
 def countries(d: dict) -> pd.DataFrame:
     df = d["df"].copy()
     med = d["median_import"]
@@ -91,6 +124,8 @@ def countries(d: dict) -> pd.DataFrame:
         "exposed": df["exposed"].astype(int),
         "worse_since_2016": ((df["ghi_2025"] - df["ghi_2016"]) > 0).astype(int),
         "median_import_pct": round(med, 1),
+        "flag_url": df["iso3"].map(lambda c: f"https://flagcdn.com/w40/{ISO2[c]}.png"),
+        "change_arrow": ((df["ghi_2025"] - df["ghi_2016"]) > 0).map({True: "▲", False: "▼"}),
     })
     return out.sort_values("ghi_2025", ascending=False)
 
@@ -103,6 +138,9 @@ def main() -> None:
     c.to_csv(OUT / "live_countries.csv", index=False)
     sig = signal_table(d)
     sig.to_csv(OUT / "live_signal.csv", index=False)
+    runs = signal_runs(d)
+    runs.to_csv(OUT / "live_signal_runs.csv", index=False)
+    assert list(runs["lead"].str.extract(r"(\d+)")[0].dropna().astype(int)) == d["findings"]["warning"]["lead_months"]
     f = d["findings"]
     # sanity checks against the published findings
     assert c["exposed"].sum() == f["exposure"]["exposed_count"]

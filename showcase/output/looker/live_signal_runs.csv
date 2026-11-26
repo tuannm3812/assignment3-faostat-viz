@@ -1,0 +1,6 @@
+signal_start,signal_months,what_followed,lead,outcome
+2002-09-01,Sep 2002 - Nov 2002,No shock followed,False alarm,False alarm
+2004-03-01,Mar 2004,Apr 2004 spike,1 month,Shock followed
+2006-12-01,Dec 2006 - Apr 2007,2007-08 shock,5 months,Shock followed
+2010-08-01,Aug 2010,2010-11 shock,1 month,Shock followed
+2020-11-01,Nov 2020 - Feb 2021,2021-22 shock,4 months,Shock followed
