@@ -1,0 +1,464 @@
+{
+  "shock": {
+    "threshold_yoy_pct": 20.0,
+    "major_episodes": [
+      [
+        "2007-05",
+        "2008-08"
+      ],
+      [
+        "2010-09",
+        "2011-08"
+      ],
+      [
+        "2021-03",
+        "2022-06"
+      ]
+    ],
+    "peaks": [
+      [
+        "2008-06",
+        132.7
+      ],
+      [
+        "2011-02",
+        137.7
+      ],
+      [
+        "2022-03",
+        160.2
+      ]
+    ],
+    "record": [
+      "2022-03",
+      160.2
+    ],
+    "series_start": "1990-01",
+    "latest": [
+      "2026-03",
+      128.5
+    ],
+    "max_yoy_pct": [
+      "2008-03",
+      63.2
+    ]
+  },
+  "drivers": {
+    "groups": [
+      "Vegetable oils",
+      "Cereals",
+      "Dairy",
+      "Sugar",
+      "Meat",
+      "All food"
+    ],
+    "rows": [
+      {
+        "shock": "2007\u201308",
+        "values": [
+          109.2,
+          91.3,
+          106.3,
+          49.0,
+          27.7,
+          63.2
+        ]
+      },
+      {
+        "shock": "2010\u201311",
+        "values": [
+          63.5,
+          67.6,
+          33.7,
+          61.9,
+          19.8,
+          40.5
+        ]
+      },
+      {
+        "shock": "2021\u201322",
+        "values": [
+          124.9,
+          37.3,
+          31.7,
+          58.3,
+          24.0,
+          40.8
+        ]
+      }
+    ]
+  },
+  "exposure": {
+    "countries_plotted": 91,
+    "import_year_min": 2015,
+    "import_year_max": 2024,
+    "median_food_import_pct": 16.3,
+    "serious_hunger_threshold": 20.0,
+    "exposed_count": 20,
+    "exposed": [
+      [
+        "Madagascar",
+        18.4,
+        35.8
+      ],
+      [
+        "Haiti",
+        37.3,
+        35.7
+      ],
+      [
+        "Niger",
+        37.9,
+        33.9
+      ],
+      [
+        "Central African Republic",
+        20.9,
+        33.4
+      ],
+      [
+        "Papua New Guinea",
+        16.5,
+        31.0
+      ],
+      [
+        "Liberia",
+        23.1,
+        30.0
+      ],
+      [
+        "Afghanistan",
+        26.9,
+        29.0
+      ],
+      [
+        "Sierra Leone",
+        32.3,
+        28.5
+      ],
+      [
+        "Timor-Leste",
+        28.1,
+        28.0
+      ],
+      [
+        "Benin",
+        33.3,
+        25.9
+      ],
+      [
+        "Mozambique",
+        19.6,
+        25.9
+      ],
+      [
+        "Kenya",
+        16.3,
+        25.9
+      ],
+      [
+        "Guinea-Bissau",
+        41.7,
+        25.4
+      ],
+      [
+        "Guinea",
+        26.6,
+        23.7
+      ],
+      [
+        "Congo (Republic of)",
+        21.2,
+        22.6
+      ],
+      [
+        "Djibouti",
+        38.6,
+        21.9
+      ],
+      [
+        "Rwanda",
+        22.4,
+        21.7
+      ],
+      [
+        "Zimbabwe",
+        19.0,
+        20.9
+      ],
+      [
+        "C\u00f4te d'Ivoire",
+        20.5,
+        20.4
+      ],
+      [
+        "Solomon Islands",
+        22.2,
+        20.4
+      ]
+    ]
+  },
+  "warning": {
+    "rule": "vegetable oils and cereals both >20% above a year earlier, outside a shock",
+    "period": [
+      "2000-01",
+      "2026-03"
+    ],
+    "signals": 5,
+    "followed_by_shock_within_12m": 4,
+    "lead_months": [
+      1,
+      5,
+      1,
+      4
+    ],
+    "signal_runs": [
+      [
+        "2002-09",
+        "2002-11",
+        null
+      ],
+      [
+        "2004-03",
+        "2004-03",
+        "2004-04"
+      ],
+      [
+        "2006-12",
+        "2007-04",
+        "2007-05"
+      ],
+      [
+        "2010-08",
+        "2010-08",
+        "2010-09"
+      ],
+      [
+        "2020-11",
+        "2021-02",
+        "2021-03"
+      ]
+    ],
+    "shock_episodes_since_2000": 4,
+    "shock_starts_without_prior_signal": [],
+    "latest_yoy_pct": {
+      "month": "2026-03",
+      "oils": 13.2,
+      "cereals": 0.6,
+      "all_food": 1.0
+    },
+    "note": "Rule read off the full 2000-2026 history, not trained blind; treat as a signal to watch, not a forecast."
+  },
+  "anatomy": [
+    {
+      "start": "2007-05",
+      "end": "2008-08",
+      "base_month": "2006-05",
+      "base": 71.3,
+      "peak_month": "2008-06",
+      "peak": 132.7,
+      "rise_pct": 86.1,
+      "months_in_shock": 16,
+      "months_to_peak": 13,
+      "back_to_base": null,
+      "months_to_base": null,
+      "low_after": 84.3
+    },
+    {
+      "start": "2010-09",
+      "end": "2011-08",
+      "base_month": "2009-09",
+      "base": 93.1,
+      "peak_month": "2011-02",
+      "peak": 137.7,
+      "rise_pct": 47.9,
+      "months_in_shock": 12,
+      "months_to_peak": 5,
+      "back_to_base": "2015-08",
+      "months_to_base": 54,
+      "low_after": 115.8
+    },
+    {
+      "start": "2021-03",
+      "end": "2022-06",
+      "base_month": "2020-03",
+      "base": 95.2,
+      "peak_month": "2022-03",
+      "peak": 160.2,
+      "rise_pct": 68.3,
+      "months_in_shock": 16,
+      "months_to_peak": 12,
+      "back_to_base": null,
+      "months_to_base": null,
+      "low_after": 117.4
+    }
+  ],
+  "hunger_trend": {
+    "worse_count": 6,
+    "of": 20,
+    "worse": [
+      [
+        "Haiti",
+        29.9,
+        35.7,
+        5.8
+      ],
+      [
+        "Kenya",
+        23.1,
+        25.9,
+        2.8
+      ],
+      [
+        "Benin",
+        23.8,
+        25.9,
+        2.1
+      ],
+      [
+        "Afghanistan",
+        28.0,
+        29.0,
+        1.0
+      ],
+      [
+        "Madagascar",
+        35.0,
+        35.8,
+        0.8
+      ],
+      [
+        "Niger",
+        33.3,
+        33.9,
+        0.6
+      ]
+    ],
+    "most_improved": [
+      "Mozambique",
+      -10.5
+    ],
+    "high_hunger_low_import": [
+      "Dem. Rep. of the Congo",
+      "Nigeria",
+      "Angola"
+    ],
+    "serious_hunger_count": 33
+  },
+  "ausnz": {
+    "items": 118,
+    "years": [
+      1991,
+      2025
+    ],
+    "change_2008": {
+      "Australia": 7.7,
+      "New Zealand": 2.9,
+      "World": 24.5
+    },
+    "change_2022": {
+      "Australia": 4.1,
+      "New Zealand": 0.4,
+      "World": 14.9
+    },
+    "corr_with_world": {
+      "Australia": 0.28,
+      "New Zealand": 0.34
+    },
+    "range": {
+      "Australia": [
+        53.9,
+        120.6
+      ],
+      "New Zealand": [
+        61.1,
+        121.1
+      ],
+      "World": [
+        53.4,
+        144.5
+      ]
+    }
+  },
+  "now": {
+    "month": "2026-03",
+    "groups": [
+      [
+        "Vegetable oils",
+        13.2,
+        183.1
+      ],
+      [
+        "Cereals",
+        0.6,
+        110.4
+      ],
+      [
+        "Meat",
+        8.0,
+        127.7
+      ],
+      [
+        "Dairy",
+        -18.7,
+        120.9
+      ],
+      [
+        "Sugar",
+        -21.0,
+        92.4
+      ],
+      [
+        "All food",
+        1.0,
+        128.5
+      ]
+    ],
+    "below_record_pct": 19.8,
+    "above_base_pct": 28.5
+  },
+  "backtest": [
+    {
+      "start": "2002-09",
+      "oils": 24.8,
+      "cereals": 24.8,
+      "shock_start": null,
+      "lead": null
+    },
+    {
+      "start": "2004-03",
+      "oils": 29.5,
+      "cereals": 21.2,
+      "shock_start": "2004-04",
+      "lead": 1
+    },
+    {
+      "start": "2006-12",
+      "oils": 30.7,
+      "cereals": 38.9,
+      "shock_start": "2007-05",
+      "lead": 5
+    },
+    {
+      "start": "2010-08",
+      "oils": 24.5,
+      "cereals": 22.9,
+      "shock_start": "2010-09",
+      "lead": 1
+    },
+    {
+      "start": "2020-11",
+      "oils": 30.8,
+      "cereals": 20.2,
+      "shock_start": "2021-03",
+      "lead": 4
+    }
+  ],
+  "data": {
+    "months": 435,
+    "ghi_countries": 98,
+    "wb_rows": 9984,
+    "pp_rows": 6511
+  },
+  "font": "Google Sans"
+}
