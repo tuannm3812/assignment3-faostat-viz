@@ -4,6 +4,8 @@ Outputs (loaded into Google Sheets that Looker reads):
   showcase/output/looker/live_monthly.csv    one row per month and food group, with year-on-year change and
                                               the shock and signal flags, so every number on the shock and
                                               warning tabs is computed live and follows the filters
+  showcase/output/looker/live_signal.csv     one row per month with oils and cereals year-on-year change
+                                              side by side, for the warning tab
   showcase/output/looker/live_countries.csv  one row per country with hunger score, food-import share and
                                               the exposed flag, for the exposure tab
 
@@ -55,6 +57,25 @@ def monthly(d: dict) -> pd.DataFrame:
     return out
 
 
+def signal_table(d: dict) -> pd.DataFrame:
+    """One row per month for the warning tab: the two signal prices side by side, plus the flags."""
+    yoy = d["yoy"]
+    shock = yoy["ffpi_food"] > SHOCK_THRESHOLD
+    oils, cereals = yoy["ffpi_oils"] > SHOCK_THRESHOLD, yoy["ffpi_cereals"] > SHOCK_THRESHOLD
+    signal = oils & cereals & ~shock
+    out = pd.DataFrame({
+        "date": yoy.index.strftime("%Y-%m-%d"),
+        "oils_yoy": yoy["ffpi_oils"].round(1).values,
+        "cereals_yoy": yoy["ffpi_cereals"].round(1).values,
+        "food_yoy": yoy["ffpi_food"].round(1).values,
+        "signal_month": signal.astype(int).values,
+        "shock_month": shock.astype(int).values,
+        "is_latest": (yoy.index == yoy.index.max()).astype(int),
+        "signal_state": signal.map({True: "On", False: "Off"}).values,
+    })
+    return out.dropna(subset=["oils_yoy"])
+
+
 def countries(d: dict) -> pd.DataFrame:
     df = d["df"].copy()
     med = d["median_import"]
@@ -80,6 +101,8 @@ def main() -> None:
     m, c = monthly(d), countries(d)
     m.to_csv(OUT / "live_monthly.csv", index=False)
     c.to_csv(OUT / "live_countries.csv", index=False)
+    sig = signal_table(d)
+    sig.to_csv(OUT / "live_signal.csv", index=False)
     f = d["findings"]
     # sanity checks against the published findings
     assert c["exposed"].sum() == f["exposure"]["exposed_count"]
